@@ -97,8 +97,6 @@ Windows compiler and nothing in this course will work as described.
 
 Docs: [Using C++ and WSL in VS Code](https://code.visualstudio.com/docs/cpp/config-wsl)
 
----
-
 ## macOS
 
 ### 1. Open the Terminal
@@ -146,8 +144,6 @@ every handout are the same, and your code will compile identically.
 > at Apple Clang.
 
 Docs: [Using Clang in VS Code on macOS](https://code.visualstudio.com/docs/cpp/config-clang-mac)
-
----
 
 ## Linux
 
@@ -206,8 +202,6 @@ your Linux terminal, with your file under `~`.
 
 Full list: [GCC warning options](https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html)
 
----
-
 ## VS Code (recommended on macOS and Windows)
 
 1. Download from [code.visualstudio.com/download](https://code.visualstudio.com/download).
@@ -219,8 +213,6 @@ Full list: [GCC warning options](https://gcc.gnu.org/onlinedocs/gcc/Warning-Opti
    not need to configure `tasks.json` or a debugger for this course.
 
 Docs: [C/C++ for Visual Studio Code](https://code.visualstudio.com/docs/languages/cpp)
-
----
 
 ## Turn off AI autocomplete
 
@@ -240,8 +232,6 @@ To confirm it worked, open a `.cpp` file, type `for (int i = 0;` and wait three
 seconds. No grey text should appear. If you use a different editor, the same
 requirement applies: find your completion plugin and switch it off, and ask on
 Ed if you are not sure how.
-
----
 
 ## Troubleshooting
 
