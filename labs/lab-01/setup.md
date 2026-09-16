@@ -20,7 +20,7 @@ Pick your platform below.
 
 ## Windows
 
-**Use WSL.** Do not use MinGW, Cygwin, or MSVC. WSL gives you a real Linux
+**Use WSL.** Do not use MinGW, Cygwin, or MSVC. WSL gives you a Linux
 system running alongside Windows, which is the same kind of environment the
 graders and the autograder use.
 
@@ -134,14 +134,7 @@ $ g++ --version
 ```
 
 You will see something like `Apple clang version 17.0.0`. **This is expected.**
-On macOS, `g++` is a front end for Clang rather than GNU GCC. For everything in
-this course they are interchangeable: the command is still `g++`, the flags in
-every handout are the same, and your code will compile identically.
-
-> **If you want genuine GNU GCC** (you almost certainly do not need it):
-> install [Homebrew](https://brew.sh), run `brew install gcc`, and the real
-> compiler is then `g++-15`, note the version suffix. Plain `g++` still points
-> at Apple Clang.
+On macOS, `g++` is a front end for Clang rather than GNU GCC. For this course, Apple Clang provides the required C++17 functionality.
 
 Docs: [Using Clang in VS Code on macOS](https://code.visualstudio.com/docs/cpp/config-clang-mac)
 
@@ -196,7 +189,7 @@ your Linux terminal, with your file under `~`.
 | `-std=c++17` | use the 2017 language standard (the default varies by compiler version) |
 | `-Wall` | turn on the common warnings |
 | `-Wextra` | turn on the ones `-Wall` leaves out. Several of them catch real bugs |
-| `-Werror` | treat every warning as an error. Use it before you submit |
+| `-Werror` | treat every warning as an error |
 | `-g` | keep debug symbols, so a debugger can show you line numbers |
 | `-O2` | optimize. Use it for benchmarking, never for debugging |
 
@@ -241,7 +234,7 @@ Ed if you are not sure how.
 | `wsl --install` fails | Enable virtualization in your BIOS/UEFI, then retry. See [WSL install docs](https://learn.microsoft.com/en-us/windows/wsl/install). |
 | VS Code bottom-left does not mention WSL | Close the window, go back to the Linux terminal, `cd` to your folder, run `code .` again. |
 | `error: 'std::sort' was not declared` | A missing `#include`. C++ does not include transitively in a guaranteed way. Add `<algorithm>`. |
-| Warnings you do not understand | Read them top to bottom. **The first error is the real one**; the rest are usually fallout. |
+| Warnings you do not understand | Read them top to bottom. The first error is tipycally the one to investigate first; the rest are usually fallout. |
 | `permission denied` running `./prog` | `chmod +x prog`, or you are on a Windows-mounted path (`/mnt/c/...`), move to `~`. |
 
 Still stuck? Post on **Ed** with your OS, the exact command you ran, and the
