@@ -344,6 +344,10 @@ Upload the following files to Gradescope:
 - `test_two_sum.cpp` (with the two test cases you added to `test_your_cases`)
 - `answers.md`
 
+> [!WARNING]
+> **Upload the four files themselves, and nothing else.** The autograder checks
+> this before it looks at your code.
+
 Your code should compile clean under `-Wall -Wextra -Werror` and be readable.
 
 Questions: ask the instructor or a TA **in the room**, or post on Ed.
