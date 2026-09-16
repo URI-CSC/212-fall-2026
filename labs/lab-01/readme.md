@@ -337,7 +337,7 @@ why can't a compiler fix this one?
 
 ## Submission
 
-Upload to Gradescope:
+Upload the following files to Gradescope:
 
 - `hello.cpp`
 - `two_sum.cpp` (your two implementations)
