@@ -17,17 +17,6 @@ Do this **before** lab; it takes 15 minutes.
 > How to switch it off, in VS Code and in other editors:
 > [`setup.md` -> Turn off AI autocomplete](setup.md#turn-off-ai-autocomplete).
 
-## What you hand in
-
-| file | what it is |
-|---|---|
-| `hello.cpp` | Task 1: proof your toolchain works |
-| `two_sum.cpp` | Task 2: your two implementations |
-| `test_two_sum.cpp` | Task 2: with the two test cases you added |
-| `answers.md` | Tasks 3-5: your tables and, more importantly, your explanations |
-
-Everything else in `starter/` is provided and you do not need to modify it.
-
 > [!IMPORTANT]
 > **Work inside `starter/`.** Everything you write goes there, and every command
 > in this handout runs from that one directory. Start by going there and staying
