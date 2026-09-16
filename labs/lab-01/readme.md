@@ -56,7 +56,7 @@ $ g++ -std=c++17 -Wall -Wextra -Werror hello.cpp -o hello
 > **Before you move on, count.** Row 1 prints 1 star, row 2 prints 3, row 3
 > prints 5. Row $i$ prints $2i - 1$. So the whole pyramid prints
 >
-> $$1 + 3 + 5 + \dots + (2n-1) \,=\, n^2 \text{ stars.}$$
+> $$1 + 3 + 5 + \dots + (2n-1) = n^2 \text{ stars.}$$
 >
 > Double $n$ and you print **four times** as many stars. You just wrote a
 > _quadratic program_, and you can see the shape of its cost on the screen, the
@@ -185,8 +185,8 @@ So do not read the numbers. **Read the ratios between them.**
 Suppose the running time follows a power law, $T(n) \approx c \cdot n^{b}$, for
 some constant $c$ you do not know and some exponent $b$ you want. Then
 
-$$\frac{T(2n)}{T(n)} \,=\, \frac{c\,(2n)^{b}}{c\,n^{b}} \,=\, 2^{b}
-\qquad\Longrightarrow\qquad b \,=\, \log_{2}\!\left(\frac{T(2n)}{T(n)}\right)$$
+$$\frac{T(2n)}{T(n)} = \frac{c(2n)^{b}}{cn^{b}} = 2^{b}
+\qquad\Longrightarrow\qquad b = \log_{2}\!\left(\frac{T(2n)}{T(n)}\right)$$
 
 **Look at what happened to $c$.** It cancelled. And $c$ is where *everything*
 about your machine lives: clock speed, compiler version, `-O2` or not, the
