@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PGM viewer (CSC 212)</title>
+<style>
+  body {
+    background: #14181d;
+    color: #d8dee9;
+    font-family: Menlo, Consolas, monospace;
+    margin: 0;
+    padding: 20px;
+  }
+  h1 { font-size: 16px; margin: 0 0 12px 0; font-weight: normal; }
+  #drop {
+    border: 2px dashed #4a5563;
+    border-radius: 6px;
+    padding: 28px;
+    text-align: center;
+    color: #8b97a8;
+    margin-bottom: 14px;
+  }
+  #drop.over { border-color: #7fb4ff; color: #7fb4ff; }
+  #bar { margin-bottom: 10px; font-size: 13px; color: #9aa7b8; min-height: 18px; }
+  #pixel { color: #7fb4ff; }
+  canvas { background: #000; image-rendering: pixelated; }
+  button {
+    background: #222a33; color: #d8dee9; border: 1px solid #4a5563;
+    border-radius: 4px; padding: 3px 9px; font-family: inherit; cursor: pointer;
+  }
+  .note { color: #6b7686; font-size: 12px; margin-top: 14px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<h1>PGM viewer</h1>
+
+<div id="drop">drop a .pgm file here, or <input type="file" id="pick" accept=".pgm"></div>
+
+<div id="bar">
+  <button id="out">-</button>
+  <button id="in">+</button>
+  <span id="info">no file loaded</span>
+  <span id="pixel"></span>
+</div>
+
+<canvas id="view" width="10" height="10"></canvas>
+
+<p class="note">
+  Reads P2 (text) and P5 (binary) files. Nothing is uploaded anywhere: the file
+  is read by this page, in your browser. Hover over the picture to see the row,
+  the column, the index into the pixel array, and the value.
+</p>
+
+<script>
+"use strict";
+
+var img = null;      // { cols, rows, maxval, px }
+var scale = 1;
+var view = document.getElementById("view");
+var ctx = view.getContext("2d");
+var info = document.getElementById("info");
+var pixel = document.getElementById("pixel");
+
+// ---- parsing ------------------------------------------------------------
+// A PGM is a header of four tokens (P2 or P5, width, height, maxval) and then
+// the pixels. Tokens are separated by whitespace and '#' starts a comment.
+
+function Reader(bytes) {
+  this.b = bytes;
+  this.i = 0;
+}
+
+Reader.prototype.token = function () {
+  var b = this.b;
+  while (this.i < b.length) {
+    var ch = b[this.i];
+    if (ch === 35) {                                  // '#', skip the line
+      while (this.i < b.length && b[this.i] !== 10) { this.i++; }
+    } else if (ch === 32 || ch === 9 || ch === 10 || ch === 13) {
+      this.i++;
+    } else {
+      break;
+    }
+  }
+  var start = this.i;
+  while (this.i < b.length) {
+    var c = b[this.i];
+    if (c === 32 || c === 9 || c === 10 || c === 13 || c === 35) { break; }
+    this.i++;
+  }
+  if (start === this.i) { throw new Error("file ended inside the header"); }
+  return String.fromCharCode.apply(null, b.subarray(start, this.i));
+};
+
+function parse(bytes) {
+  var rd = new Reader(bytes);
+  var magic = rd.token();
+  if (magic !== "P2" && magic !== "P5") {
+    throw new Error("not a PGM file (found '" + magic + "', expected P2 or P5)");
+  }
+  var cols = parseInt(rd.token(), 10);
+  var rows = parseInt(rd.token(), 10);
+  var maxval = parseInt(rd.token(), 10);
+  if (!(cols > 0 && rows > 0 && maxval > 0)) { throw new Error("bad header"); }
+
+  var n = cols * rows;
+  var px = new Uint8Array(n);
+  if (magic === "P5") {
+    var at = rd.i + 1;                                // one whitespace byte
+    if (bytes.length - at < n) { throw new Error("file is short on pixels"); }
+    for (var k = 0; k < n; k++) { px[k] = bytes[at + k] * 255 / maxval; }
+  } else {
+    for (var j = 0; j < n; j++) { px[j] = parseInt(rd.token(), 10) * 255 / maxval; }
+  }
+  return { cols: cols, rows: rows, maxval: maxval, px: px };
+}
+
+// ---- drawing ------------------------------------------------------------
+
+function draw() {
+  if (img === null) { return; }
+  var off = document.createElement("canvas");
+  off.width = img.cols;
+  off.height = img.rows;
+  var octx = off.getContext("2d");
+  var data = octx.createImageData(img.cols, img.rows);
+  for (var k = 0; k < img.px.length; k++) {
+    data.data[4 * k] = img.px[k];
+    data.data[4 * k + 1] = img.px[k];
+    data.data[4 * k + 2] = img.px[k];
+    data.data[4 * k + 3] = 255;
+  }
+  octx.putImageData(data, 0, 0);
+
+  view.width = img.cols * scale;
+  view.height = img.rows * scale;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(off, 0, 0, view.width, view.height);
+
+  info.textContent = img.cols + " columns by " + img.rows + " rows, " +
+    (img.cols * img.rows) + " pixels, maxval " + img.maxval +
+    ", zoom " + scale + "x";
+}
+
+function load(file) {
+  var fr = new FileReader();
+  fr.onload = function () {
+    try {
+      img = parse(new Uint8Array(fr.result));
+      scale = Math.max(1, Math.floor(900 / img.cols));
+      draw();
+    } catch (e) {
+      info.textContent = "could not read " + file.name + ": " + e.message;
+    }
+  };
+  fr.readAsArrayBuffer(file);
+}
+
+// ---- wiring -------------------------------------------------------------
+
+var drop = document.getElementById("drop");
+drop.addEventListener("dragover", function (e) {
+  e.preventDefault();
+  drop.className = "over";
+});
+drop.addEventListener("dragleave", function () { drop.className = ""; });
+drop.addEventListener("drop", function (e) {
+  e.preventDefault();
+  drop.className = "";
+  if (e.dataTransfer.files.length > 0) { load(e.dataTransfer.files[0]); }
+});
+document.getElementById("pick").addEventListener("change", function (e) {
+  if (e.target.files.length > 0) { load(e.target.files[0]); }
+});
+document.getElementById("in").addEventListener("click", function () {
+  scale = Math.min(40, scale + 1);
+  draw();
+});
+document.getElementById("out").addEventListener("click", function () {
+  scale = Math.max(1, scale - 1);
+  draw();
+});
+view.addEventListener("mousemove", function (e) {
+  if (img === null) { return; }
+  var box = view.getBoundingClientRect();
+  var c = Math.floor((e.clientX - box.left) / scale);
+  var r = Math.floor((e.clientY - box.top) / scale);
+  if (r < 0 || c < 0 || r >= img.rows || c >= img.cols) { return; }
+  pixel.textContent = "   row " + r + ", column " + c +
+    "   index " + r + " * " + img.cols + " + " + c + " = " + (r * img.cols + c) +
+    "   value " + img.px[r * img.cols + c];
+});
+view.addEventListener("mouseleave", function () { pixel.textContent = ""; });
+</script>
+</body>
+</html>

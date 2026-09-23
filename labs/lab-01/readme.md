@@ -12,10 +12,9 @@ You need a working `g++` and a terminal -> [`setup.md`](setup.md).
 Do this **before** lab; it takes 15 minutes.
 
 > [!CAUTION]
-> ### Turn off AI autocomplete for this lab.
->
-> How to switch it off, in VS Code and in other editors:
-> [`setup.md` -> Turn off AI autocomplete](setup.md#turn-off-ai-autocomplete).
+> Turn off AI autocomplete for this lab. How to switch it off, 
+> in VS Code and in other editors:
+> [Turn off AI autocomplete](setup.md#turn-off-ai-autocomplete).
 
 > [!IMPORTANT]
 > **Work inside `starter/`.** Everything you write goes there, and every command
