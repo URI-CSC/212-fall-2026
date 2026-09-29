@@ -2,3 +2,5 @@ pptx-212/
 autograder/
 solution/
 .DS_Store
+style.md
+pptx2md.py
