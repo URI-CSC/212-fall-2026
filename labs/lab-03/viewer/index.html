@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Growth plot (CSC 212)</title>
+<style>
+  body {
+    background: #14181d;
+    color: #d8dee9;
+    font-family: Menlo, Consolas, monospace;
+    margin: 0;
+    padding: 20px;
+  }
+  h1 { font-size: 16px; margin: 0 0 12px 0; font-weight: normal; }
+  #drop {
+    border: 2px dashed #4a5563;
+    border-radius: 6px;
+    padding: 28px;
+    text-align: center;
+    color: #8b97a8;
+    margin-bottom: 14px;
+  }
+  #drop.over { border-color: #7fb4ff; color: #7fb4ff; }
+  #bar { margin-bottom: 10px; font-size: 13px; color: #9aa7b8; min-height: 18px; }
+  #bar label { margin-right: 14px; }
+  select, button {
+    background: #222a33; color: #d8dee9; border: 1px solid #4a5563;
+    border-radius: 4px; padding: 3px 9px; font-family: inherit; cursor: pointer;
+  }
+  canvas { background: #0d1014; max-width: 100%; }
+  .note { color: #6b7686; font-size: 12px; margin-top: 14px; line-height: 1.5; max-width: 900px; }
+</style>
+</head>
+<body>
+
+<h1>Growth plot</h1>
+
+<div id="drop">drop growth.csv here, or <input type="file" id="pick" accept=".csv"></div>
+
+<div id="bar">
+  <label>plot
+    <select id="metric">
+      <option value="copies">copies</option>
+      <option value="grows">grows</option>
+      <option value="ms">time (ms)</option>
+    </select>
+  </label>
+  <label>axes
+    <select id="scale">
+      <option value="log">log-log</option>
+      <option value="linear">linear</option>
+    </select>
+  </label>
+  <label><input type="checkbox" id="predict" checked> predicted n^2 / (2c)</label>
+  <span id="info">no file loaded</span>
+</div>
+
+<canvas id="plot" width="900" height="560"></canvas>
+
+<p class="note">
+  Reads the growth.csv that bench writes (columns increment, n, copies, grows,
+  ms). One line per increment c. The dashed lines are the prediction from
+  lecture, n^2 / (2c) - n / 2 copies, drawn only for the copies plot.
+  On log-log axes a straight line of slope 1 is linear growth and slope 2 is
+  quadratic: read the slopes, not the heights. Nothing is uploaded anywhere:
+  the file is read by this page, in your browser.
+</p>
+
+<script>
+"use strict";
+
+var rows = null;          // [{ c, n, copies, grows, ms }]
+var canvas = document.getElementById("plot");
+var ctx = canvas.getContext("2d");
+var info = document.getElementById("info");
+var metric = document.getElementById("metric");
+var scale = document.getElementById("scale");
+var predict = document.getElementById("predict");
+
+// Distinct hues that read on a dark background.
+var COLORS = ["#ff7b72", "#f2cc60", "#7ee787", "#79c0ff", "#d2a8ff", "#ffa657"];
+
+// ---- parsing ------------------------------------------------------------
+
+function parse(text) {
+  var lines = text.split(/\r?\n/).filter(function (l) { return l.trim() !== ""; });
+  if (lines.length < 2) { throw new Error("the file has no data rows"); }
+  var head = lines[0].split(",").map(function (h) { return h.trim(); });
+  var want = ["increment", "n", "copies", "grows", "ms"];
+  var col = {};
+  want.forEach(function (w) {
+    var k = head.indexOf(w);
+    if (k < 0) { throw new Error("missing column '" + w + "'"); }
+    col[w] = k;
+  });
+  var out = [];
+  for (var i = 1; i < lines.length; i++) {
+    var f = lines[i].split(",");
+    out.push({
+      c: Number(f[col.increment]), n: Number(f[col.n]),
+      copies: Number(f[col.copies]), grows: Number(f[col.grows]),
+      ms: Number(f[col.ms])
+    });
+  }
+  return out;
+}
+
+// ---- drawing ------------------------------------------------------------
+
+function series() {
+  var by = {};
+  rows.forEach(function (r) {
+    (by[r.c] = by[r.c] || []).push(r);
+  });
+  return Object.keys(by).map(Number).sort(function (a, b) { return a - b; })
+    .map(function (c) {
+      return { c: c, pts: by[c].sort(function (a, b) { return a.n - b.n; }) };
+    });
+}
+
+// A round step (1, 2 or 5 times a power of ten) that cuts `range` into
+// about `parts` pieces.
+function niceStep(range, parts) {
+  var raw = range / parts;
+  var p = Math.pow(10, Math.floor(Math.log10(raw)));
+  var f = raw / p;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p;
+}
+
+function predicted(c, n) { return n * n / (2 * c) - n / 2; }
+
+function draw() {
+  var W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  if (!rows) { return; }
+
+  var key = metric.value;
+  var log = scale.value === "log";
+  var showPred = predict.checked && key === "copies";
+  var S = series();
+
+  var L = 90, R = 150, T = 20, B = 50;     // margins; legend on the right
+  var xs = [], ys = [];
+  S.forEach(function (s) {
+    s.pts.forEach(function (p) {
+      xs.push(p.n);
+      if (p[key] > 0 || !log) { ys.push(p[key]); }
+      if (showPred && predicted(s.c, p.n) > 0) { ys.push(predicted(s.c, p.n)); }
+    });
+  });
+  var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
+  var y0 = log ? Math.min.apply(null, ys) : 0, y1 = Math.max.apply(null, ys);
+  if (log) {
+    // x: the n values themselves, which double; y: whole powers of ten
+    y0 = Math.pow(10, Math.floor(Math.log10(y0)));
+    y1 = Math.pow(10, Math.ceil(Math.log10(y1)));
+  } else {
+    x0 = 0;
+    x1 = niceStep(x1, 5) * Math.ceil(x1 / niceStep(x1, 5));
+    y1 = niceStep(y1, 5) * Math.ceil(y1 / niceStep(y1, 5));
+  }
+  if (x1 <= x0) { x1 = x0 + 1; }
+  if (y1 <= y0) { y1 = y0 + 1; }
+
+  function tx(v) {
+    var t = log ? (Math.log10(v) - Math.log10(x0)) / (Math.log10(x1) - Math.log10(x0))
+                : (v - x0) / (x1 - x0);
+    return L + t * (W - L - R);
+  }
+  function ty(v) {
+    var t = log ? (Math.log10(v) - Math.log10(y0)) / (Math.log10(y1) - Math.log10(y0))
+                : (v - y0) / (y1 - y0);
+    return H - B - t * (H - T - B);
+  }
+  function fmt(v) {
+    if (v === 0) { return "0"; }
+    if (Math.abs(v) >= 1e6) {
+      var e = Math.floor(Math.log10(Math.abs(v)));
+      var m = Math.round(v / Math.pow(10, e) * 10) / 10;
+      return m + "e" + e;
+    }
+    if (Math.abs(v) < 0.01) { return v.toExponential(0).replace("+", ""); }
+    return String(Math.round(v * 1000) / 1000);
+  }
+
+  // axes and grid
+  ctx.strokeStyle = "#2a323c";
+  ctx.fillStyle = "#8b97a8";
+  ctx.font = "12px Menlo, Consolas, monospace";
+  ctx.lineWidth = 1;
+  var ticks = function (a, b, isX) {
+    var t = [];
+    if (log && isX) {
+      for (var v = a; v <= b * 1.0001; v *= 2) { t.push(v); }
+      if (t.length > 9) { t = t.filter(function (u, k) { return k % 2 === 0; }); }
+    } else if (log) {
+      for (var e = Math.round(Math.log10(a)); e <= Math.round(Math.log10(b)); e++) { t.push(Math.pow(10, e)); }
+    } else {
+      var step = niceStep(b - a, 5);
+      for (var u = a; u <= b + step / 2; u += step) { t.push(u); }
+    }
+    return t;
+  };
+  ticks(x0, x1, true).forEach(function (v) {
+    var x = tx(v);
+    ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, H - B); ctx.stroke();
+    ctx.textAlign = "center"; ctx.fillText(fmt(v), x, H - B + 18);
+  });
+  ticks(y0, y1, false).forEach(function (v) {
+    var y = ty(v);
+    ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(W - R, y); ctx.stroke();
+    ctx.textAlign = "right"; ctx.fillText(fmt(v), L - 8, y + 4);
+  });
+  ctx.textAlign = "center";
+  ctx.fillText("n (elements appended)", L + (W - L - R) / 2, H - 12);
+  ctx.save();
+  ctx.translate(16, T + (H - T - B) / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText(metric.options[metric.selectedIndex].text, 0, 0);
+  ctx.restore();
+
+  // one line per increment
+  S.forEach(function (s, i) {
+    var color = COLORS[i % COLORS.length];
+    var pts = s.pts.filter(function (p) { return !log || p[key] > 0; });
+
+    if (showPred) {
+      ctx.strokeStyle = color; ctx.globalAlpha = 0.55; ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      s.pts.forEach(function (p, k) {
+        var v = predicted(s.c, p.n);
+        if (log && v <= 0) { return; }
+        if (k === 0) { ctx.moveTo(tx(p.n), ty(v)); } else { ctx.lineTo(tx(p.n), ty(v)); }
+      });
+      ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha = 1;
+    }
+
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2;
+    ctx.beginPath();
+    pts.forEach(function (p, k) {
+      if (k === 0) { ctx.moveTo(tx(p.n), ty(p[key])); } else { ctx.lineTo(tx(p.n), ty(p[key])); }
+    });
+    ctx.stroke();
+    pts.forEach(function (p) {
+      ctx.beginPath(); ctx.arc(tx(p.n), ty(p[key]), 3, 0, 2 * Math.PI); ctx.fill();
+    });
+    ctx.lineWidth = 1;
+
+    // legend
+    var ly = T + 10 + i * 20;
+    ctx.fillRect(W - R + 16, ly - 5, 14, 3);
+    ctx.textAlign = "left";
+    ctx.fillText("c = " + s.c, W - R + 38, ly);
+  });
+}
+
+// ---- loading ------------------------------------------------------------
+
+function load(file) {
+  var reader = new FileReader();
+  reader.onload = function () {
+    try {
+      rows = parse(reader.result);
+      info.textContent = file.name + ": " + rows.length + " rows";
+    } catch (e) {
+      rows = null;
+      info.textContent = "could not read " + file.name + ": " + e.message;
+    }
+    draw();
+  };
+  reader.readAsText(file);
+}
+
+var drop = document.getElementById("drop");
+drop.addEventListener("dragover", function (e) { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", function () { drop.classList.remove("over"); });
+drop.addEventListener("drop", function (e) {
+  e.preventDefault();
+  drop.classList.remove("over");
+  if (e.dataTransfer.files.length) { load(e.dataTransfer.files[0]); }
+});
+document.getElementById("pick").addEventListener("change", function (e) {
+  if (e.target.files.length) { load(e.target.files[0]); }
+});
+[metric, scale, predict].forEach(function (el) { el.addEventListener("change", draw); });
+</script>
+</body>
+</html>
