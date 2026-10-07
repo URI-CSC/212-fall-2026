@@ -7,8 +7,6 @@ back, and keeps the paint on the redo stack in case you want it again. At the
 end you will replay a whole drawing session and watch the canvas and the two
 stacks in a viewer.
 
-This lab is short: about one hour. You need a working `g++` and a terminal.
-
 > [!CAUTION]
 > Turn off AI autocomplete for this lab. How to switch it off,
 > in VS Code and in other editors:
@@ -31,7 +29,7 @@ see `ALL TESTS PASSED`.
 
 ## std::stack in one minute
 
-`std::stack<T>` from `<stack>` is the stack from lecture, ready to use:
+`std::stack<T>` from the STL is the stack shown in lecture, ready to use:
 
 | call | does | cost |
 |---|---|---|
@@ -56,9 +54,8 @@ s.pop();           // then remove it
 
 The canvas is a 16 x 16 grid of pixels. Each pixel holds one color, written
 as one character: `'.'` is empty, `'r'` is red, `'y'` is yellow, and so on.
-A pixel is named by its row, then its column:
 
-```
+```text
         col 0 1 2 3 4 5 ...
 row 0       . . . . . .
 row 1       . . . . . .
@@ -69,18 +66,18 @@ row 3       . . . . . .
 Every paint is an **edit**. An edit remembers which pixel changed, its color
 before, and its color after:
 
-```
+```c++
 paint(2, 3, 'b')    on a red pixel   ->   Edit{ 2, 3, 'r', 'b' }
                                                row col before after
 ```
 
 The class has three data members:
 
-- `m_pixels`: the colors, a `SIZE x SIZE` array of `char`
+- `m_pixels`: the colors, a `SIZE x SIZE` 2D array of `char`
 - `m_undo`: the edits that `undo()` can reverse (Task 2)
 - `m_redo`: the edits that `redo()` can put back (Task 3)
 
-The constructor sets every pixel to `'.'`. The stacks start empty on their
+The constructor sets every pixel to `'.'`. Both stacks start empty on their
 own. The class calls `new` nowhere, so it needs no destructor.
 
 The private method `check(row, col)` throws `std::out_of_range` when the
@@ -109,9 +106,9 @@ struct Edit {
 
 class Canvas {
     private:
-        char             m_pixels[SIZE][SIZE];  // one color per pixel
-        std::stack<Edit> m_undo;  // paints that undo() can reverse (Task 2)
-        std::stack<Edit> m_redo;  // paints that redo() can put back (Task 3)
+        char m_pixels[SIZE][SIZE]; // one color per pixel
+        std::stack<Edit> m_undo;   // paints that undo() can reverse (Task 2)
+        std::stack<Edit> m_redo;   // paints that redo() can put back (Task 3)
 
         void check(int row, int col) const;
 
