@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pixel art viewer (CSC 212)</title>
+<style>
+  body {
+    background: #14181d;
+    color: #d8dee9;
+    font-family: Menlo, Consolas, monospace;
+    margin: 0;
+    padding: 20px;
+  }
+  h1 { font-size: 16px; margin: 0 0 12px 0; font-weight: normal; }
+  #drop {
+    border: 2px dashed #4a5563;
+    border-radius: 6px;
+    padding: 28px;
+    text-align: center;
+    color: #8b97a8;
+    margin-bottom: 14px;
+  }
+  #drop.over { border-color: #7fb4ff; color: #7fb4ff; }
+  #drop.small { padding: 8px; font-size: 12px; }
+  #bar { margin-bottom: 14px; font-size: 13px; color: #9aa7b8; }
+  #bar span { margin-left: 12px; }
+  button, select {
+    background: #222a33; color: #d8dee9; border: 1px solid #4a5563;
+    border-radius: 4px; padding: 3px 9px; font-family: inherit; cursor: pointer;
+  }
+  button:disabled { opacity: 0.4; cursor: default; }
+
+  #main { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+  #steps {
+    width: 200px; flex: none; max-height: 600px; overflow-y: auto;
+    border: 1px solid #2a323c; border-radius: 6px; font-size: 12px;
+  }
+  .step {
+    padding: 4px 8px; cursor: pointer; white-space: pre; overflow: hidden;
+    text-overflow: ellipsis; border-left: 3px solid transparent; color: #9aa7b8;
+  }
+  .step:hover { background: #1c232b; }
+  .step.cur { background: #222a33; color: #e6edf3; border-left-color: #7fb4ff; }
+  .step.err { color: #ff7b72; }
+  .step .n { color: #5c6776; display: inline-block; width: 26px; }
+
+  #center { flex: none; }
+  #cmd { font-size: 15px; margin-bottom: 4px; }
+  #what { font-size: 12px; color: #9aa7b8; min-height: 36px; width: 420px; line-height: 1.5; }
+  #what .bad { color: #ff7b72; }
+
+  /* the canvas */
+  #grid { display: grid; gap: 1px; background: #2a323c; border: 1px solid #2a323c;
+          width: max-content; margin-top: 8px; }
+  .lbl { background: #14181d; color: #4a5563; font-size: 9px; text-align: center;
+         line-height: 22px; width: 22px; height: 22px; }
+  .px { width: 22px; height: 22px; position: relative; transition: background 0.3s ease; }
+  .px.changed::after {
+    content: ""; position: absolute; inset: 2px; border: 2px solid #ffffff;
+    border-radius: 2px; box-shadow: 0 0 0 1px #000000;
+  }
+  #legend { margin-top: 10px; font-size: 11px; color: #8b97a8; width: 420px; line-height: 2; }
+  #legend .sw { margin: 0 3px 0 10px; }
+
+  /* the two stacks */
+  #stacks { display: flex; gap: 22px; }
+  .col { width: 190px; }
+  .col h2 { font-size: 13px; font-weight: normal; color: #9aa7b8; margin: 0 0 6px 0; }
+  .well {
+    position: relative; border: 2px solid #3a4350; border-top: none;
+    border-radius: 0 0 6px 6px;
+  }
+  .more { font-size: 11px; color: #6b7686; text-align: center; height: 16px; margin-top: 4px; }
+  .card {
+    position: absolute; left: 8px; right: 8px; height: 26px;
+    border-radius: 4px; font-size: 12px; line-height: 26px; padding: 0 8px;
+    white-space: pre; background: #222a33; border: 1px solid #3a4350;
+    transition: transform 0.45s ease, opacity 0.45s ease;
+    box-sizing: border-box;
+  }
+  .card.top { box-shadow: 0 0 0 2px #7fb4ff; }
+  .sw {
+    display: inline-block; width: 12px; height: 12px; vertical-align: -2px;
+    border: 1px solid #5c6776; border-radius: 2px;
+  }
+  .toplabel { position: absolute; right: -34px; font-size: 11px; color: #7fb4ff;
+              transition: opacity 0.45s ease; }
+
+  .note { color: #6b7686; font-size: 12px; margin-top: 18px; line-height: 1.5; max-width: 900px; }
+  kbd { border: 1px solid #4a5563; border-radius: 3px; padding: 0 4px; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<h1>Pixel art viewer</h1>
+
+<div id="drop">drop session.log here, or <input type="file" id="pick" accept=".log,.txt"></div>
+
+<div id="bar">
+  <button id="first" disabled>|&lt;</button>
+  <button id="prev" disabled>&lt;</button>
+  <button id="play" disabled>play</button>
+  <button id="next" disabled>&gt;</button>
+  <button id="last" disabled>&gt;|</button>
+  <select id="speed">
+    <option value="1400">slow</option>
+    <option value="800" selected>normal</option>
+    <option value="350">fast</option>
+  </select>
+  <span id="info">no file loaded</span>
+</div>
+
+<div id="main">
+  <div id="steps"></div>
+  <div id="center">
+    <div id="cmd"></div>
+    <div id="what"></div>
+    <div id="grid"></div>
+    <div id="legend"></div>
+  </div>
+  <div id="stacks">
+    <div class="col"><h2>undo stack</h2><div class="well" id="wundo"></div><div class="more" id="mundo"></div></div>
+    <div class="col"><h2>redo stack</h2><div class="well" id="wredo"></div><div class="more" id="mredo"></div></div>
+  </div>
+</div>
+
+<p class="note">
+  Reads the log that <code>./session script.txt &gt; session.log</code> writes.
+  Each step is one command from the script, followed by what your
+  <code>print()</code> wrote. Pixels changed by the step have a white outline.
+  A card is one paint: <code>(row, col)</code>, the color before, and the color
+  after. The top of each stack is drawn first, with a blue outline; only the
+  top <span id="vis"></span> cards of a stack are drawn. Keys:
+  <kbd>&larr;</kbd> <kbd>&rarr;</kbd> step, <kbd>space</kbd> play.
+  Nothing is uploaded anywhere: the file is read by this page, in your browser.
+</p>
+
+<script>
+"use strict";
+
+var SIZE = 16;
+var VISIBLE = 16;               // cards drawn per stack
+var CARD_H = 26, GAP = 5, PAD = 8;
+
+var COLORS = {
+  ".": ["#f4f1ea", "empty"],
+  "k": ["#1b1b1b", "black"],
+  "w": ["#ffffff", "white"],
+  "r": ["#e5484d", "red"],
+  "o": ["#f76b15", "orange"],
+  "y": ["#ffd60a", "yellow"],
+  "g": ["#30a46c", "green"],
+  "b": ["#3e63dd", "blue"],
+  "p": ["#8e4ec6", "purple"],
+  "n": ["#8d5b3a", "brown"]
+};
+function color(c) { return COLORS[c] ? COLORS[c][0] : "#9aa7b8"; }
+
+var states = null;   // [{ cmd, msgs, rows: [string], undo: [edit], redo: [edit] }], stacks bottom first
+var cur = 0;
+var timer = null;
+var cards = {};      // id -> DOM element
+var labels = {};
+var pixels = [];     // [row][col] -> DOM element
+
+var $ = function (id) { return document.getElementById(id); };
+
+// ---- parsing ------------------------------------------------------------
+
+function parse(raw) {
+  var lines = raw.split(/\r?\n/);
+  var out = [], i = 0;
+  function fail(msg) { throw new Error("line " + (i + 1) + ": " + msg); }
+  function readStack(name) {
+    var line = (lines[i] || "").trim();
+    var m = line.match(new RegExp("^" + name + " (\\d+)$"));
+    if (!m) { fail("expected '" + name + " <count>', got '" + line + "'"); }
+    i++;
+    var k = Number(m[1]), items = [];
+    for (var j = 0; j < k; j++) {
+      var e = (lines[i] || "").trim().split(/\s+/);
+      if (e.length !== 4 || isNaN(Number(e[0])) || isNaN(Number(e[1]))) {
+        fail("expected 'row col before after', got '" + (lines[i] || "") + "'");
+      }
+      items.push({ row: Number(e[0]), col: Number(e[1]), before: e[2], after: e[3] });
+      i++;
+    }
+    return items.reverse();   // printed top first; kept bottom first
+  }
+  while (i < lines.length) {
+    if (lines[i].trim() === "") { i++; continue; }
+    if (lines[i].indexOf("> ") !== 0) { fail("expected '> command', got '" + lines[i] + "'"); }
+    var s = { cmd: lines[i].slice(2), msgs: [], rows: [] };
+    i++;
+    while (i < lines.length && lines[i].indexOf("! ") === 0) { s.msgs.push(lines[i].slice(2)); i++; }
+    for (var r = 0; r < SIZE; r++) {
+      var row = lines[i] || "";
+      if (row.length !== SIZE) { fail("expected a canvas row of " + SIZE + " pixels, got '" + row + "'"); }
+      s.rows.push(row);
+      i++;
+    }
+    s.undo = readStack("undo");
+    s.redo = readStack("redo");
+    out.push(s);
+  }
+  if (out.length === 0) { throw new Error("no steps found"); }
+  return out;
+}
+
+// ---- identity: the same paint keeps its card as it moves ----------------
+
+function same(a, b) {
+  return a.row === b.row && a.col === b.col && a.before === b.before && a.after === b.after;
+}
+
+function assignIds(list) {
+  var next = 1;
+  list.forEach(function (s, k) {
+    var prev = k > 0 ? list[k - 1] : null;
+    var released = [];
+    ["undo", "redo"].forEach(function (name) {
+      var p = prev ? prev[name] : [], c = s[name], j = 0;
+      while (j < p.length && j < c.length && same(p[j], c[j])) { c[j].id = p[j].id; j++; }
+      for (var r = p.length - 1; r >= j; r--) { released.push(p[r]); }   // tops first
+    });
+    ["undo", "redo"].forEach(function (name) {
+      s[name].forEach(function (e) {
+        if (e.id) { return; }
+        for (var r = 0; r < released.length; r++) {
+          if (same(released[r], e)) { e.id = released[r].id; released.splice(r, 1); return; }
+        }
+        e.id = next++;
+      });
+    });
+  });
+}
+
+// ---- drawing ------------------------------------------------------------
+
+function esc(t) {
+  return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function sw(c) {
+  return '<span class="sw" style="background:' + color(c) + '" title="' + esc(c) + '"></span>';
+}
+
+function cardHtml(e) {
+  return "(" + e.row + ", " + e.col + ")  " + sw(e.before) + " -&gt; " + sw(e.after);
+}
+
+function plural(n, word) { return n + " " + word + (n === 1 ? "" : "s"); }
+
+function describe(k) {
+  var s = states[k], p = k > 0 ? states[k - 1] : null;
+  var bits = [];
+  s.msgs.forEach(function (m) { bits.push('<span class="bad">' + esc(m) + "</span>"); });
+  if (!p) { return "an empty canvas, two empty stacks"; }
+  var word = s.cmd.split(" ")[0];
+  var du = s.undo.length - p.undo.length, dr = s.redo.length - p.redo.length;
+  if (word === "undo" && du < 0) {
+    bits.push(plural(-du, "paint") + " popped from undo; each pixel set back to its " +
+              "<b>before</b> color; each paint pushed onto redo");
+  } else if (word === "redo" && dr < 0) {
+    bits.push(plural(-dr, "paint") + " popped from redo; each pixel set to its " +
+              "<b>after</b> color; each paint pushed onto undo");
+  } else if (du > 0) {
+    bits.push("pushed " + plural(du, "new paint") + " onto undo");
+    if (p.redo.length > 0) {
+      bits.push("cleared redo: " + plural(p.redo.length, "paint") + " can not come back");
+    }
+  } else if (bits.length === 0) {
+    bits.push("nothing changed");
+  }
+  return bits.join("; ");
+}
+
+function buildGrid() {
+  var g = $("grid");
+  g.innerHTML = "";
+  g.style.gridTemplateColumns = "repeat(" + (SIZE + 1) + ", 22px)";
+  pixels = [];
+  function label(text) {
+    var l = document.createElement("div");
+    l.className = "lbl";
+    l.textContent = text;
+    g.appendChild(l);
+  }
+  label("");
+  for (var c = 0; c < SIZE; c++) { label(c); }
+  for (var r = 0; r < SIZE; r++) {
+    label(r);
+    pixels.push([]);
+    for (c = 0; c < SIZE; c++) {
+      var d = document.createElement("div");
+      d.className = "px";
+      d.style.background = color(".");
+      g.appendChild(d);
+      pixels[r].push(d);
+    }
+  }
+}
+
+function drawGrid(k) {
+  var now = states[k].rows, before = k > 0 ? states[k - 1].rows : now;
+  for (var r = 0; r < SIZE; r++) {
+    for (var c = 0; c < SIZE; c++) {
+      var d = pixels[r][c], ch = now[r][c];
+      d.style.background = color(ch);
+      d.title = "(" + r + ", " + c + ")  " + ch;
+      d.classList.toggle("changed", ch !== before[r][c]);
+    }
+  }
+}
+
+function y(fromTop) { return PAD + fromTop * (CARD_H + GAP); }   // 0 is the top card
+
+function drawStacks(k) {
+  var s = states[k], seen = {};
+  ["undo", "redo"].forEach(function (name) {
+    var well = $("w" + name);
+    var list = s[name], n = list.length;
+    for (var t = 0; t < Math.min(n, VISIBLE); t++) {
+      var e = list[n - 1 - t];
+      seen[e.id] = true;
+      var el = cards[e.id];
+      if (!el) {
+        el = document.createElement("div");
+        el.style.transition = "none";
+        el.style.transform = "translateY(" + (y(t) - 30) + "px)";
+        el.style.opacity = "0";
+        well.appendChild(el);
+        cards[e.id] = el;
+      } else if (el.parentNode !== well) {
+        // moving between stacks: start from where it was, in the new well
+        var from = el.getBoundingClientRect(), to = well.getBoundingClientRect();
+        well.appendChild(el);
+        el.style.transition = "none";
+        el.style.transform = "translate(" + (from.left - to.left - PAD - 2) + "px," +
+                             (from.top - to.top) + "px)";
+      }
+      el.className = "card" + (t === 0 ? " top" : "");
+      el.innerHTML = cardHtml(e);
+      void el.offsetWidth;   // commit the start position, so the move animates
+      el.style.transition = "";
+      el.style.transform = "translateY(" + y(t) + "px)";
+      el.style.opacity = "1";
+    }
+    labels[name].style.opacity = n ? "1" : "0";
+    $("m" + name).textContent = n > VISIBLE ? "+ " + (n - VISIBLE) + " more below" :
+                                n === 0 ? "empty" : plural(n, "paint");
+  });
+  Object.keys(cards).forEach(function (id) {
+    if (seen[id]) { return; }
+    var el = cards[id];
+    delete cards[id];
+    el.style.opacity = "0";
+    setTimeout(function () { if (el.parentNode) { el.parentNode.removeChild(el); } }, 500);
+  });
+}
+
+function go(k) {
+  if (!states) { return; }
+  cur = Math.max(0, Math.min(states.length - 1, k));
+  var s = states[cur];
+  $("cmd").textContent = "step " + cur + ":  " + s.cmd;
+  $("what").innerHTML = describe(cur);
+  drawGrid(cur);
+  drawStacks(cur);
+  Array.prototype.forEach.call(document.querySelectorAll(".step"), function (el, i) {
+    el.classList.toggle("cur", i === cur);
+    if (i === cur) { el.scrollIntoView({ block: "nearest" }); }
+  });
+  $("first").disabled = $("prev").disabled = cur === 0;
+  $("next").disabled = $("last").disabled = cur === states.length - 1;
+  $("info").textContent = "step " + cur + " of " + (states.length - 1);
+}
+
+function stop() {
+  if (timer) { clearInterval(timer); timer = null; }
+  $("play").textContent = "play";
+}
+
+function play() {
+  if (timer) { stop(); return; }
+  if (cur === states.length - 1) { go(0); }
+  $("play").textContent = "pause";
+  timer = setInterval(function () {
+    if (cur >= states.length - 1) { stop(); return; }
+    go(cur + 1);
+  }, Number($("speed").value));
+}
+
+// ---- loading ------------------------------------------------------------
+
+function load(text, name) {
+  stop();
+  try {
+    states = parse(text);
+  } catch (err) {
+    states = null;
+    $("info").textContent = name + ": " + err.message;
+    return;
+  }
+  assignIds(states);
+  var depth = 1;
+  states.forEach(function (s) { depth = Math.max(depth, s.undo.length, s.redo.length); });
+  var shown = Math.min(depth, VISIBLE);
+  cards = {};
+  ["undo", "redo"].forEach(function (name) {
+    var well = $("w" + name);
+    well.innerHTML = "";
+    well.style.height = (2 * PAD + shown * (CARD_H + GAP) - GAP) + "px";
+    var lab = document.createElement("div");
+    lab.className = "toplabel";
+    lab.textContent = "top";
+    lab.style.top = (y(0) + 6) + "px";
+    well.appendChild(lab);
+    labels[name] = lab;
+  });
+
+  var list = $("steps");
+  list.innerHTML = "";
+  states.forEach(function (s, i) {
+    var d = document.createElement("div");
+    d.className = "step" + (s.msgs.length ? " err" : "");
+    d.innerHTML = '<span class="n">' + i + "</span>" + esc(s.cmd);
+    d.onclick = function () { stop(); go(i); };
+    list.appendChild(d);
+  });
+  ["first", "prev", "next", "last", "play"].forEach(function (b) { $(b).disabled = false; });
+  $("drop").classList.add("small");
+  go(0);
+}
+
+function readFile(f) {
+  var r = new FileReader();
+  r.onload = function () { load(r.result, f.name); };
+  r.readAsText(f);
+}
+
+buildGrid();
+$("vis").textContent = VISIBLE;
+$("legend").innerHTML = Object.keys(COLORS).map(function (c) {
+  return sw(c) + esc(c) + " " + COLORS[c][1];
+}).join(" ");
+
+var drop = $("drop");
+drop.addEventListener("dragover", function (e) { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", function () { drop.classList.remove("over"); });
+drop.addEventListener("drop", function (e) {
+  e.preventDefault();
+  drop.classList.remove("over");
+  if (e.dataTransfer.files.length) { readFile(e.dataTransfer.files[0]); }
+});
+$("pick").addEventListener("change", function () { if (this.files.length) { readFile(this.files[0]); } });
+
+$("first").onclick = function () { stop(); go(0); };
+$("prev").onclick = function () { stop(); go(cur - 1); };
+$("next").onclick = function () { stop(); go(cur + 1); };
+$("last").onclick = function () { stop(); go(states.length - 1); };
+$("play").onclick = play;
+document.addEventListener("keydown", function (e) {
+  if (!states || e.target.tagName === "SELECT") { return; }
+  if (e.key === "ArrowRight") { stop(); go(cur + 1); e.preventDefault(); }
+  if (e.key === "ArrowLeft") { stop(); go(cur - 1); e.preventDefault(); }
+  if (e.key === " ") { play(); e.preventDefault(); }
+});
+</script>
+</body>
+</html>
