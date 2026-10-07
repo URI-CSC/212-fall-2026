@@ -1,0 +1,37 @@
+# A short drawing session: a smiley.  One command per line; see session.cpp.
+
+# the face
+row 2 5 yyyyyy
+row 3 3 yyyyyyyyyy
+row 4 2 yyyyyyyyyyyy
+row 5 2 yyykyyyykyyy
+row 6 2 yyykyyyykyyy
+row 7 2 yyyyyyyyyyyy
+row 8 2 ykyyyyyyyyky
+row 9 2 yykyyyyyykyy
+row 10 3 yykkkkkkyy
+row 11 5 yyyyyy
+
+# a red nose, then change your mind
+paint 7 7 r
+paint 7 8 r
+undo 2
+redo
+undo
+
+# blue eyes instead of black: the new paints clear the redo stack
+paint 5 5 b
+paint 6 5 b
+paint 5 10 b
+paint 6 10 b
+redo
+
+# a pixel that is not on the canvas
+paint 16 3 r
+
+# painting a pixel the color it already has changes nothing
+paint 2 5 y
+
+# 14 undos: the blue eyes, the chin, and part of the mouth.  Then 10 redos.
+undo 14
+redo 10
