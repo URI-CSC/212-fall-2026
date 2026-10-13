@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sliding window viewer (CSC 212)</title>
+<style>
+  body {
+    background: #14181d;
+    color: #d8dee9;
+    font-family: Menlo, Consolas, monospace;
+    margin: 0;
+    padding: 20px;
+  }
+  h1 { font-size: 16px; margin: 0 0 12px 0; font-weight: normal; }
+  #drop {
+    border: 2px dashed #4a5563;
+    border-radius: 6px;
+    padding: 28px;
+    text-align: center;
+    color: #8b97a8;
+    margin-bottom: 14px;
+  }
+  #drop.over { border-color: #7fb4ff; color: #7fb4ff; }
+  #drop.small { padding: 8px; font-size: 12px; }
+  #bar { margin-bottom: 14px; font-size: 13px; color: #9aa7b8; }
+  #bar span { margin-left: 12px; }
+  #info.bad { color: #ff7b72; }
+  button, select {
+    background: #222a33; color: #d8dee9; border: 1px solid #4a5563;
+    border-radius: 4px; padding: 3px 9px; font-family: inherit; cursor: pointer;
+  }
+  button:disabled { opacity: 0.4; cursor: default; }
+
+  #main { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+  #steps {
+    width: 170px; flex: none; max-height: 560px; overflow-y: auto;
+    border: 1px solid #2a323c; border-radius: 6px; font-size: 12px;
+  }
+  .step {
+    padding: 4px 8px; cursor: pointer; white-space: pre; overflow: hidden;
+    text-overflow: ellipsis; border-left: 3px solid transparent; color: #9aa7b8;
+  }
+  .step:hover { background: #1c232b; }
+  .step.cur { background: #222a33; color: #e6edf3; border-left-color: #7fb4ff; }
+  .step.err { color: #ff7b72; }
+  .step.warn { color: #f0b429; }
+  .step .n { color: #5c6776; display: inline-block; width: 30px; }
+
+  #center { flex: 1; min-width: 320px; max-width: 900px; }
+  #cmd { font-size: 15px; margin-bottom: 4px; }
+  #what { font-size: 12px; color: #9aa7b8; min-height: 54px; line-height: 1.6; }
+  #what .bad { color: #ff7b72; }
+  #what .warn { color: #f0b429; }
+  #what .pb { color: #ff7b72; }
+  #what .pf { color: #f76b15; }
+  #what .mx { color: #ffd60a; }
+
+  #chart { width: 100%; height: auto; display: block; margin-top: 6px; }
+  #chart text { font-family: Menlo, Consolas, monospace; }
+
+  #dq { margin-top: 16px; }
+  #dq h2 { font-size: 13px; font-weight: normal; color: #9aa7b8; margin: 0 0 6px 0; }
+  #cards { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-height: 34px; }
+  .end { font-size: 11px; color: #6b7686; }
+  .card {
+    border-radius: 4px; font-size: 12px; line-height: 26px; padding: 0 8px;
+    white-space: pre; background: #222a33; border: 1px solid #3a4350;
+    animation: in 0.35s ease;
+  }
+  .card .i { color: #6b7686; }
+  .card.front { box-shadow: 0 0 0 2px #ffd60a; }
+  @keyframes in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; } }
+
+  #legend { margin-top: 14px; font-size: 11px; color: #8b97a8; line-height: 2; }
+  .sw {
+    display: inline-block; width: 12px; height: 12px; vertical-align: -2px;
+    border-radius: 2px; margin: 0 4px 0 12px;
+  }
+  .note { color: #6b7686; font-size: 12px; margin-top: 18px; line-height: 1.5; max-width: 900px; }
+  kbd { border: 1px solid #4a5563; border-radius: 3px; padding: 0 4px; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<h1>Sliding window viewer</h1>
+
+<div id="drop">drop session.log here, or <input type="file" id="pick" accept=".log,.txt"></div>
+
+<div id="bar">
+  <button id="first" disabled>|&lt;</button>
+  <button id="prev" disabled>&lt;</button>
+  <button id="play" disabled>play</button>
+  <button id="next" disabled>&gt;</button>
+  <button id="last" disabled>&gt;|</button>
+  <select id="speed">
+    <option value="1600">slow</option>
+    <option value="900" selected>normal</option>
+    <option value="400">fast</option>
+  </select>
+  <span id="info">no file loaded</span>
+</div>
+
+<div id="main">
+  <div id="steps"></div>
+  <div id="center">
+    <div id="cmd"></div>
+    <div id="what"></div>
+    <svg id="chart" viewBox="0 0 900 300"></svg>
+    <div id="dq">
+      <h2>deque</h2>
+      <div id="cards"></div>
+    </div>
+    <div id="legend"></div>
+  </div>
+</div>
+
+<p class="note">
+  Reads the log that <code>./session small.txt 6 &gt; session.log</code> writes.
+  Each step is one <code>push</code>, followed by what your <code>print()</code>
+  wrote and the <code>max</code> your class returned. The shaded band is the
+  window: the last k values. The dashed line joins the values in the deque, in
+  order. Values a step removes are outlined: red when popped from the back,
+  orange when popped from the front. Keys: <kbd>&larr;</kbd> <kbd>&rarr;</kbd>
+  step, <kbd>space</kbd> play. Nothing is uploaded anywhere: the file is read
+  by this page, in your browser.
+</p>
+
+<script>
+"use strict";
+
+var C = {
+  future: "#232a33",
+  old: "#2f3742",
+  window: "#5c6776",
+  deque: "#3e63dd",
+  front: "#ffd60a",
+  popBack: "#ff7b72",
+  popFront: "#f76b15",
+  band: "#7fb4ff",
+  text: "#9aa7b8",
+  dim: "#4a5563"
+};
+
+var K = 0, DATA = [];
+var states = null;   // [{ index, value, deque: [{index, value}], max, msgs, popped, warns }]
+var cur = 0;
+var timer = null;
+
+var $ = function (id) { return document.getElementById(id); };
+
+function esc(t) {
+  return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// ---- parsing ------------------------------------------------------------
+
+function parse(raw) {
+  var lines = raw.split(/\r?\n/);
+  var i = 0;
+  function line() { return (lines[i] || "").replace(/\s+$/, ""); }
+  function fail(msg) { throw new Error("line " + (i + 1) + ": " + msg); }
+  function isInt(t) { return /^-?\d+$/.test(t); }
+
+  var m = line().match(/^k (\d+)$/);
+  if (!m) { fail("expected 'k <window size>', got '" + line() + "'"); }
+  var k = Number(m[1]);
+  i++;
+  var d = line().split(/\s+/);
+  if (d[0] !== "data") { fail("expected 'data <values>', got '" + line() + "'"); }
+  var data = d.slice(1).filter(function (t) { return t !== ""; }).map(Number);
+  i++;
+
+  var out = [];
+  while (i < lines.length) {
+    if (line().trim() === "") { i++; continue; }
+    if (line().indexOf("! ") === 0) {
+      if (out.length) { out[out.length - 1].msgs.push(line().slice(2)); }
+      i++;
+      continue;
+    }
+    m = line().match(/^> push (\d+) (-?\d+)$/);
+    if (!m) { fail("expected '> push <index> <value>', got '" + line() + "'"); }
+    var s = { index: Number(m[1]), value: Number(m[2]), deque: [], max: null, msgs: [] };
+    i++;
+    while (line().indexOf("! ") === 0) { s.msgs.push(line().slice(2)); i++; }
+    if (i >= lines.length || line() === "") { out.push(s); break; }
+
+    m = line().match(/^deque (\d+)$/);
+    if (!m) {
+      fail("expected 'deque <count>', got '" + line() + "'. This line comes " +
+           "from your print(): the word deque, one space, the number of entries.");
+    }
+    var n = Number(m[1]);
+    i++;
+    for (var j = 0; j < n; j++) {
+      var e = line().match(/^ {4}(-?\d+) (-?\d+)$/);
+      if (!e) {
+        fail("expected an entry '    <index> <value>' (4 spaces, then two numbers " +
+             "separated by one space), got '" + line() + "'. print() said " + n +
+             (n === 1 ? " entry" : " entries") + "; this is entry " + (j + 1) + ".");
+      }
+      s.deque.push({ index: Number(e[1]), value: Number(e[2]) });
+      i++;
+    }
+    m = line().match(/^max (-?\d+)$/);
+    if (m) {
+      s.max = Number(m[1]);
+      i++;
+    } else if (!/^(> |! )/.test(line()) && line().trim() !== "") {
+      fail("expected 'max <value>' or the next '> push', got '" + line() +
+           "'. Did print() write more entries than its count says?");
+    }
+    while (line().indexOf("! ") === 0) { s.msgs.push(line().slice(2)); i++; }
+    out.push(s);
+  }
+  if (out.length === 0) { throw new Error("no steps found"); }
+  if (!isInt(String(k)) || k < 1) { throw new Error("k must be at least 1"); }
+  K = k;
+  DATA = data;
+  return out;
+}
+
+// ---- what each step did --------------------------------------------------
+
+function key(e) { return e.index + ":" + e.value; }
+
+function analyze(list) {
+  list.forEach(function (s, n) {
+    var prev = n > 0 ? list[n - 1].deque : [];
+    var now = {};
+    s.deque.forEach(function (e) { now[key(e)] = true; });
+    var lo = s.index - K + 1;
+    s.popBack = [];
+    s.popFront = [];
+    prev.forEach(function (e) {
+      if (now[key(e)]) { return; }
+      (e.index < lo ? s.popFront : s.popBack).push(e);
+    });
+    s.warns = [];
+    for (var j = 0; j < s.deque.length; j++) {
+      var e = s.deque[j];
+      if (e.index < lo || e.index > s.index) {
+        s.warns.push("index " + e.index + " is outside the window (" + Math.max(0, lo) +
+                     " to " + s.index + ") but still in the deque");
+        break;
+      }
+    }
+    var last = s.deque[s.deque.length - 1];
+    if (s.deque.length && (last.index !== s.index || last.value !== s.value)) {
+      s.warns.push("the value just pushed is not at the back of the deque");
+    }
+    var stair = true;
+    for (j = 1; j < s.deque.length; j++) {
+      if (s.deque[j].value >= s.deque[j - 1].value) { stair = false; }
+    }
+    s.stair = stair;
+    var truth = null;
+    for (j = Math.max(0, lo); j <= s.index && j < DATA.length; j++) {
+      truth = truth === null ? DATA[j] : Math.max(truth, DATA[j]);
+    }
+    s.truth = truth;
+    if (s.max !== null && truth !== null && s.max !== truth) {
+      s.warns.push("max() returned " + s.max + ", but the largest value in the window is " + truth);
+    }
+  });
+}
+
+function entries(list, cls) {
+  return list.map(function (e) {
+    return '<span class="' + cls + '">#' + e.index + " (" + e.value + ")</span>";
+  }).join(", ");
+}
+
+function describe(s) {
+  var bits = [];
+  s.msgs.forEach(function (m) { bits.push('<span class="bad">' + esc(m) + "</span>"); });
+  if (s.popFront.length) {
+    bits.push(entries(s.popFront, "pf") + " left the window: popped from the front");
+  }
+  if (s.popBack.length) {
+    bits.push(entries(s.popBack, "pb") + (s.popBack.length === 1 ? " is" : " are") +
+              " not bigger than " + s.value + ", so can never be the max again: popped " +
+              "from the back");
+  }
+  bits.push(s.value + " pushed on the back");
+  var out = bits.join("<br>");
+  if (s.max !== null) {
+    out += '<br>max of the window: <span class="mx">' + s.max + "</span>";
+  }
+  s.warns.forEach(function (w) { out += '<br><span class="bad">' + esc(w) + "</span>"; });
+  if (!s.stair && !s.warns.length) {
+    out += '<br><span class="warn">the deque does not go down from front to back: ' +
+           "every value in the window is kept (Task 2). After Task 3 it is a staircase.</span>";
+  }
+  return out;
+}
+
+// ---- drawing ------------------------------------------------------------
+
+var W = 900, H = 300, L = 36, R = 8, T = 16, B = 26;
+
+function svg(tag, attrs, text) {
+  var el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  Object.keys(attrs).forEach(function (a) { el.setAttribute(a, attrs[a]); });
+  if (text !== undefined) { el.textContent = text; }
+  return el;
+}
+
+function drawChart(n) {
+  var s = states[n], chart = $("chart");
+  chart.innerHTML = "";
+  var count = Math.max(DATA.length, s.index + 1);
+  var lo = Math.min(0, Math.min.apply(null, DATA));
+  var hi = Math.max(1, Math.max.apply(null, DATA));
+  var slot = (W - L - R) / count, bw = Math.max(2, slot * 0.72);
+  function x(i) { return L + i * slot + (slot - bw) / 2; }
+  function y(v) { return T + (hi - v) / (hi - lo) * (H - T - B); }
+
+  // window band
+  var first = Math.max(0, s.index - K + 1);
+  chart.appendChild(svg("rect", {
+    x: L + first * slot, y: T - 10, width: (s.index - first + 1) * slot, height: H - T - B + 10,
+    fill: C.band, "fill-opacity": 0.09, stroke: C.band, "stroke-opacity": 0.5, rx: 3
+  }));
+  chart.appendChild(svg("text", {
+    x: L + first * slot + 4, y: T - 1, fill: C.band, "font-size": 10
+  }, "window, k = " + K));
+
+  // axis
+  [lo, hi].forEach(function (v) {
+    chart.appendChild(svg("text", { x: L - 6, y: y(v) + 4, fill: C.dim, "font-size": 10,
+                                    "text-anchor": "end" }, v));
+  });
+  chart.appendChild(svg("line", { x1: L, x2: W - R, y1: y(Math.max(lo, 0)), y2: y(Math.max(lo, 0)),
+                                  stroke: C.dim, "stroke-width": 1 }));
+
+  var inDeque = {}, front = s.deque.length ? s.deque[0].index : -1;
+  s.deque.forEach(function (e) { inDeque[e.index] = true; });
+  var gone = {};
+  s.popBack.forEach(function (e) { gone[e.index] = C.popBack; });
+  s.popFront.forEach(function (e) { gone[e.index] = C.popFront; });
+
+  var step = Math.ceil(count / 40);
+  for (var i = 0; i < count; i++) {
+    var v = i < DATA.length ? DATA[i] : 0;
+    var fill = i > s.index ? C.future
+             : i === front ? C.front
+             : inDeque[i] ? C.deque
+             : i >= first ? C.window : C.old;
+    var top = Math.min(y(v), y(Math.max(lo, 0))), h = Math.max(1, Math.abs(y(v) - y(Math.max(lo, 0))));
+    var bar = svg("rect", { x: x(i), y: top, width: bw, height: h, fill: fill, rx: 1 });
+    bar.appendChild(svg("title", {}, "#" + i + ": " + v));
+    chart.appendChild(bar);
+    if (gone[i]) {
+      chart.appendChild(svg("rect", { x: x(i) - 1.5, y: top - 1.5, width: bw + 3, height: h + 3,
+                                      fill: "none", stroke: gone[i], "stroke-width": 2, rx: 2 }));
+    }
+    if (i === s.index) {
+      chart.appendChild(svg("rect", { x: x(i) - 1.5, y: top - 1.5, width: bw + 3, height: h + 3,
+                                      fill: "none", stroke: "#ffffff", "stroke-width": 1.5, rx: 2 }));
+    }
+    if (i % step === 0) {
+      chart.appendChild(svg("text", { x: x(i) + bw / 2, y: H - 8, fill: C.dim, "font-size": 9,
+                                      "text-anchor": "middle" }, i));
+    }
+  }
+
+  // the staircase: the deque's values, front to back
+  if (s.deque.length) {
+    var pts = [];
+    s.deque.forEach(function (e, j) {
+      var yy = y(e.value);
+      if (j > 0) { pts.push((x(e.index) - (slot - bw) / 2) + "," + y(s.deque[j - 1].value)); }
+      pts.push((x(e.index) - (slot - bw) / 2) + "," + yy);
+      pts.push((x(e.index) + bw + (slot - bw) / 2) + "," + yy);
+    });
+    chart.appendChild(svg("polyline", { points: pts.join(" "), fill: "none", stroke: C.front,
+                                        "stroke-width": 1.5, "stroke-dasharray": "4 3",
+                                        "stroke-opacity": 0.8 }));
+    if (slot >= 14) {
+      s.deque.forEach(function (e) {
+        chart.appendChild(svg("text", { x: x(e.index) + bw / 2, y: y(e.value) - 5,
+                                        fill: e.index === front ? C.front : "#c9d4ff",
+                                        "font-size": 10, "text-anchor": "middle" }, e.value));
+      });
+    }
+  }
+}
+
+function drawCards(n) {
+  var s = states[n], box = $("cards");
+  var prev = n > 0 ? states[n - 1].deque : [];
+  var had = {};
+  prev.forEach(function (e) { had[key(e)] = true; });
+  var html = '<span class="end">front</span>';
+  s.deque.forEach(function (e, j) {
+    html += '<span class="card' + (j === 0 ? " front" : "") + '"' +
+            (had[key(e)] ? ' style="animation:none"' : "") + '><span class="i">#' +
+            e.index + "</span> " + e.value + "</span>";
+  });
+  html += '<span class="end">back</span>';
+  if (!s.deque.length) { html = '<span class="end">empty</span>'; }
+  box.innerHTML = html;
+}
+
+function go(n) {
+  if (!states) { return; }
+  cur = Math.max(0, Math.min(states.length - 1, n));
+  var s = states[cur];
+  $("cmd").textContent = "step " + cur + ":  push #" + s.index + " (" + s.value + ")";
+  $("what").innerHTML = describe(s);
+  drawChart(cur);
+  drawCards(cur);
+  Array.prototype.forEach.call(document.querySelectorAll(".step"), function (el, i) {
+    el.classList.toggle("cur", i === cur);
+    if (i === cur) { el.scrollIntoView({ block: "nearest" }); }
+  });
+  $("first").disabled = $("prev").disabled = cur === 0;
+  $("next").disabled = $("last").disabled = cur === states.length - 1;
+  $("info").textContent = "step " + cur + " of " + (states.length - 1) + ",  k = " + K;
+}
+
+function stop() {
+  if (timer) { clearInterval(timer); timer = null; }
+  $("play").textContent = "play";
+}
+
+function play() {
+  if (timer) { stop(); return; }
+  if (cur === states.length - 1) { go(0); }
+  $("play").textContent = "pause";
+  timer = setInterval(function () {
+    if (cur >= states.length - 1) { stop(); return; }
+    go(cur + 1);
+  }, Number($("speed").value));
+}
+
+// ---- loading ------------------------------------------------------------
+
+function load(text, name) {
+  stop();
+  $("info").classList.remove("bad");
+  try {
+    states = parse(text);
+  } catch (err) {
+    states = null;
+    $("info").textContent = name + ": " + err.message;
+    $("info").classList.add("bad");
+    return;
+  }
+  analyze(states);
+  var list = $("steps");
+  list.innerHTML = "";
+  states.forEach(function (s, i) {
+    var d = document.createElement("div");
+    d.className = "step" + (s.msgs.length || s.warns.length ? " err" : !s.stair ? " warn" : "");
+    d.innerHTML = '<span class="n">' + i + "</span>push " + s.value;
+    d.onclick = function () { stop(); go(i); };
+    list.appendChild(d);
+  });
+  ["first", "prev", "next", "last", "play"].forEach(function (b) { $(b).disabled = false; });
+  $("drop").classList.add("small");
+  go(0);
+}
+
+function readFile(f) {
+  var r = new FileReader();
+  r.onload = function () { load(r.result, f.name); };
+  r.readAsText(f);
+}
+
+$("legend").innerHTML = [
+  [C.front, "front of the deque: the max"],
+  [C.deque, "in the deque"],
+  [C.window, "in the window, not in the deque"],
+  [C.old, "left the window"],
+  [C.future, "not pushed yet"]
+].map(function (p) {
+  return '<span class="sw" style="background:' + p[0] + '"></span>' + p[1];
+}).join(" ");
+
+var drop = $("drop");
+drop.addEventListener("dragover", function (e) { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", function () { drop.classList.remove("over"); });
+drop.addEventListener("drop", function (e) {
+  e.preventDefault();
+  drop.classList.remove("over");
+  if (e.dataTransfer.files.length) { readFile(e.dataTransfer.files[0]); }
+});
+$("pick").addEventListener("change", function () { if (this.files.length) { readFile(this.files[0]); } });
+
+$("first").onclick = function () { stop(); go(0); };
+$("prev").onclick = function () { stop(); go(cur - 1); };
+$("next").onclick = function () { stop(); go(cur + 1); };
+$("last").onclick = function () { stop(); go(states.length - 1); };
+$("play").onclick = play;
+document.addEventListener("keydown", function (e) {
+  if (!states || e.target.tagName === "SELECT") { return; }
+  if (e.key === "ArrowRight") { stop(); go(cur + 1); e.preventDefault(); }
+  if (e.key === "ArrowLeft") { stop(); go(cur - 1); e.preventDefault(); }
+  if (e.key === " ") { play(); e.preventDefault(); }
+});
+</script>
+</body>
+</html>
