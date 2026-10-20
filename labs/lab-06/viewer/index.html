@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BPE viewer (CSC 212)</title>
+<style>
+  body {
+    color-scheme: dark;
+    background: #14181d;
+    color: #d8dee9;
+    font-family: Menlo, Consolas, monospace;
+    margin: 0;
+    padding: 20px;
+  }
+  h1 { font-size: 16px; margin: 0 0 12px 0; font-weight: normal; }
+  h2 { font-size: 13px; font-weight: normal; color: #9aa7b8; margin: 0 0 8px 0; }
+  button, select {
+    background: #222a33; color: #d8dee9; border: 1px solid #4a5563;
+    border-radius: 4px; padding: 3px 9px; font-family: inherit; cursor: pointer;
+  }
+  button:disabled { opacity: 0.4; cursor: default; }
+  kbd { border: 1px solid #4a5563; border-radius: 3px; padding: 0 4px; font-size: 11px; }
+
+  #drop {
+    border: 2px dashed #4a5563; border-radius: 6px; padding: 28px;
+    text-align: center; color: #8b97a8; margin-bottom: 14px; max-width: 1200px;
+    box-sizing: border-box;
+  }
+  #drop.over { border-color: #7fb4ff; color: #7fb4ff; }
+  #drop.small { padding: 8px; font-size: 12px; }
+  #bar { margin-bottom: 12px; font-size: 13px; color: #9aa7b8; display: flex;
+         gap: 8px; align-items: center; flex-wrap: wrap; }
+  #status { margin-left: 8px; }
+  #status.done { color: #3fb950; }
+  #status.bad { color: #ff7b72; }
+
+  #explain {
+    border: 1px solid #2a323c; border-left: 3px solid #7fb4ff; border-radius: 6px;
+    padding: 10px 14px; font-size: 13px; line-height: 1.7; margin-bottom: 14px;
+    max-width: 1200px; min-height: 46px;
+  }
+  #explain .step { color: #7fb4ff; }
+  #explain .tok { background: #222a33; border-radius: 3px; padding: 0 4px; }
+  #explain .bad { color: #ff7b72; }
+
+  .panel { border: 1px solid #2a323c; border-radius: 6px; padding: 12px; margin-bottom: 14px; }
+  #grid { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; max-width: 1200px; }
+  #left { flex: 3; min-width: 340px; }
+  #right { flex: 2; min-width: 300px; }
+
+  /* the text, as chips */
+  #text { line-height: 2.1; font-size: 13px; max-height: 330px; overflow-y: auto; }
+  .chip {
+    display: inline-block; white-space: pre; border-radius: 3px; padding: 0 2px;
+    margin: 1px 1px; line-height: 20px; border: 1px solid transparent;
+    background: #1c232b; color: #c9d1d9;
+  }
+  .chip.m { color: #14181d; }
+  .chip .ws { opacity: 0.55; }
+  .chip.pairL { box-shadow: 0 0 0 2px #ffd60a; }
+  .chip.pairR { box-shadow: 0 0 0 2px #ff7b72; }
+  .chip.fresh { box-shadow: 0 0 0 2px #3fb950; animation: pop 0.6s ease; }
+  @keyframes pop { from { transform: scale(1.35); } to { transform: scale(1); } }
+  .nl { display: block; height: 0; }
+
+  /* the linked list */
+  #list { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 0; font-size: 12px; }
+  .ptr { color: #6b7686; padding: 0 3px; }
+  .node {
+    display: inline-flex; flex-direction: column; align-items: center;
+    border: 1px solid #4a5563; border-radius: 4px; min-width: 38px;
+    background: #1c232b;
+  }
+  .node .id { padding: 2px 6px; border-bottom: 1px solid #4a5563; width: 100%;
+              text-align: center; box-sizing: border-box; }
+  .node .tx { padding: 2px 6px; color: #9aa7b8; white-space: pre; }
+  .node.pairL { border-color: #ffd60a; box-shadow: 0 0 0 1px #ffd60a; }
+  .node.pairR { border: 1px dashed #ff7b72; opacity: 0.75; }
+  .node.fresh { border-color: #3fb950; box-shadow: 0 0 0 1px #3fb950; animation: pop 0.6s ease; }
+  .tag { font-size: 10px; color: #ff7b72; display: block; text-align: center; }
+  .headlbl { color: #7fb4ff; font-size: 11px; margin-right: 4px; }
+
+  /* pair counts */
+  .row { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: 3px 0; }
+  .row .name { width: 150px; white-space: pre; overflow: hidden; }
+  .row .barw { flex: 1; background: #1c232b; border-radius: 3px; height: 14px; }
+  .row .bar { background: #4a5563; height: 14px; border-radius: 3px; }
+  .row.best .bar { background: #ffd60a; }
+  .row .n { width: 34px; text-align: right; color: #9aa7b8; }
+
+  /* vocabulary and the decode stack */
+  #vocab { max-height: 230px; overflow-y: auto; font-size: 12px; }
+  #vocab table { border-collapse: collapse; width: 100%; }
+  #vocab td { padding: 2px 6px; white-space: pre; border-bottom: 1px solid #1f262e; }
+  #vocab tr { cursor: pointer; }
+  #vocab tr:hover { background: #1c232b; }
+  #vocab tr.sel { background: #222a33; }
+  #vocab tr.new td:first-child { color: #3fb950; }
+  #tree { font-size: 12px; overflow: auto; max-height: 420px; }
+  #tree table { border-collapse: collapse; }
+  #tree th { color: #6b7686; font-weight: normal; text-align: left; padding: 2px 8px; }
+  #tree td { padding: 2px 8px; white-space: pre; border-bottom: 1px solid #1f262e; }
+  #tree .pop { color: #7fb4ff; }
+  #tree .chr { color: #3fb950; }
+
+  #console { font-size: 12px; white-space: pre-wrap; max-height: 160px; overflow-y: auto;
+             color: #9aa7b8; }
+  #console .err { color: #ff7b72; }
+  #console .end { color: #3fb950; }
+  .note { color: #6b7686; font-size: 12px; line-height: 1.5; max-width: 1200px; }
+</style>
+</head>
+<body>
+
+<h1>BPE viewer: your TokenList, merge by merge</h1>
+
+<div id="drop">drop bpe.log here, or <input type="file" id="pick" accept=".log,.txt"></div>
+
+<div id="bar">
+  <button id="back" disabled>&lt; back</button>
+  <button id="next" disabled>next &gt;</button>
+  <button id="play" disabled>play</button>
+  <select id="speed">
+    <option value="1500">slow</option>
+    <option value="700" selected>normal</option>
+    <option value="200">fast</option>
+  </select>
+  <span id="where"></span>
+  <span id="status">no file loaded</span>
+</div>
+
+<div id="explain">Make the log with <code>./bpe tiny.txt 30 &gt; bpe.log</code>, then drop it above.</div>
+
+<div id="grid">
+  <div id="left">
+    <div class="panel">
+      <h2>the text, as tokens (one box per node)</h2>
+      <div id="text"></div>
+    </div>
+    <div class="panel">
+      <h2>the linked list, from m_head (first nodes)</h2>
+      <div id="list"></div>
+    </div>
+    <div class="panel">
+      <h2>end of the log</h2>
+      <div id="console"></div>
+    </div>
+  </div>
+  <div id="right">
+    <div class="panel">
+      <h2>most frequent pairs of neighbors</h2>
+      <div id="pairs"></div>
+    </div>
+    <div class="panel">
+      <h2>rules learned so far (click one)</h2>
+      <div id="vocab"></div>
+    </div>
+    <div class="panel">
+      <h2>decode_token, step by step with a stack</h2>
+      <div id="tree"></div>
+    </div>
+  </div>
+</div>
+
+<p class="note">
+  <kbd>right</kbd> or <kbd>space</kbd>: next. <kbd>left</kbd>: back.
+  Spaces show as <code>_</code> and newlines as <code>\n</code>.
+  Reads the log that <code>./bpe tiny.txt 30 &gt; bpe.log</code> writes. bpe replays
+  the rules your <code>train()</code> learned, one at a time, with your <code>merge()</code>,
+  and prints your <code>size()</code> and <code>tokens()</code> after each one: every
+  picture here is your own list.
+</p>
+
+<script>
+"use strict";
+
+const frames = [];          // every picture received, in order
+let view = -1;              // the picture on screen
+let playing = null;         // the play timer
+let selected = null;        // token chosen in the rules table
+const LIST_NODES = 14;      // nodes drawn in the list panel
+
+const $ = (id) => document.getElementById(id);
+
+// ------------------------------------------------------------ token text
+
+// The text of a token.
+function textOf(tok, rules) {
+  if (tok < 256) return String.fromCharCode(tok);
+  const r = rules[tok - 256];
+  if (!r) return "?";
+  return textOf(r[0], rules) + textOf(r[1], rules);
+}
+
+function esc(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Visible spaces and newlines, as HTML.
+function show(s) {
+  let out = "";
+  for (const c of s) {
+    if (c === " ") out += '<span class="ws">_</span>';
+    else if (c === "\n") out += '<span class="ws">\\n</span>';
+    else out += esc(c);
+  }
+  return out;
+}
+
+// Plain text with visible spaces and newlines, for quotes in sentences.
+function plain(s) {
+  return esc(s.replace(/ /g, "_").replace(/\n/g, "\\n"));
+}
+
+function color(tok) {
+  const hue = (tok * 137) % 360;
+  return `hsl(${hue}, 65%, 68%)`;
+}
+
+// Positions i where tokens i and i+1 are the pair, left to right, no
+// overlap: the nodes merge() changes.
+function matches(tokens, a, b) {
+  const out = [];
+  for (let i = 0; i + 1 < tokens.length; i++) {
+    if (tokens[i] === a && tokens[i + 1] === b) { out.push(i); i++; }
+  }
+  return out;
+}
+
+// ------------------------------------------------------------ drawing
+
+function draw() {
+  const f = frames[view];
+  $("back").disabled = view <= 0;
+  $("next").disabled = view >= frames.length - 1;
+  $("play").disabled = !frames.length;
+  if (!f) return;
+
+  const rules = f.rules;
+  const merges = f.stage === "merged" ? rules.length : rules.length + 1;
+  $("where").textContent = `picture ${view + 1} of ${frames.length}, merge ${merges}`;
+
+  // which positions to mark
+  const markL = new Set(), markR = new Set(), fresh = new Set();
+  if (f.stage === "found") {
+    for (const i of matches(f.tokens, f.pair[0], f.pair[1])) { markL.add(i); markR.add(i + 1); }
+  } else {
+    const newest = 256 + rules.length - 1;
+    f.tokens.forEach((t, i) => { if (t === newest) fresh.add(i); });
+  }
+
+  explain(f);
+  drawText(f, markL, markR, fresh);
+  drawList(f, markL, markR, fresh);
+  drawPairs(f);
+  drawVocab(f);
+  drawTree(f);
+}
+
+function explain(f) {
+  const rules = f.rules;
+  let html = "";
+  if (f.stage === "found") {
+    const a = textOf(f.pair[0], rules), b = textOf(f.pair[1], rules);
+    const id = 256 + rules.length;
+    html = `<span class="step">Step 1: count.</span> <code>most_frequent_pair()</code> walked all ` +
+      `${f.count} nodes and counted every pair of neighbors. ` +
+      `The winner is <span class="tok">${plain(a)}</span> followed by <span class="tok">${plain(b)}</span> ` +
+      `(${f.pair[0]} + ${f.pair[1]}), ${f.pair[2]} times. ` +
+      `It will become token <b>${id}</b> = <span class="tok">${plain(a + b)}</span>.<br>` +
+      `Yellow: the node that will hold ${id}. Red: the node after it, which <code>merge()</code> will unlink and delete.`;
+  } else {
+    const id = 256 + rules.length - 1;
+    const r = rules[rules.length - 1];
+    html = `<span class="step">Step 2: merge.</span> <code>merge(${r[0]}, ${r[1]}, ${id})</code> walked the list once. ` +
+      `At each match it wrote ${id} into the left node and deleted the node after it: ` +
+      `<b>${f.removed}</b> nodes removed, ${f.removed} times O(1). ` +
+      `The list now has ${f.count} nodes.<br>` +
+      `Green: the nodes that now hold token ${id} = <span class="tok">${plain(textOf(id, rules))}</span>. ` +
+      `No other node moved.`;
+  }
+  if (f.size !== f.count) {
+    html += `<br><span class="bad">size() returns ${f.size}, but walking the list finds ${f.count} nodes. ` +
+      `Check how merge() updates m_size.</span>`;
+  }
+  if (f.count > f.tokens.length) {
+    html += `<br>Only the first ${f.tokens.length} tokens are drawn.`;
+  }
+  $("explain").innerHTML = html;
+}
+
+function drawText(f, markL, markR, fresh) {
+  let html = "";
+  f.tokens.forEach((t, i) => {
+    const s = textOf(t, f.rules);
+    let cls = "chip";
+    let style = "";
+    if (t >= 256) { cls += " m"; style = ` style="background:${color(t)}"`; }
+    if (markL.has(i)) cls += " pairL";
+    if (markR.has(i)) cls += " pairR";
+    if (fresh.has(i)) cls += " fresh";
+    html += `<span class="${cls}"${style} title="token ${t}">${show(s)}</span>`;
+    if (s.endsWith("\n")) html += '<span class="nl"></span>';
+  });
+  $("text").innerHTML = html;
+}
+
+function drawList(f, markL, markR, fresh) {
+  let html = '<span class="headlbl">m_head</span><span class="ptr">-&gt;</span>';
+  const n = Math.min(LIST_NODES, f.tokens.length);
+  for (let i = 0; i < n; i++) {
+    const t = f.tokens[i];
+    let cls = "node";
+    if (markL.has(i)) cls += " pairL";
+    if (markR.has(i)) cls += " pairR";
+    if (fresh.has(i)) cls += " fresh";
+    const style = t >= 256 ? ` style="color:${color(t)}"` : "";
+    html += `<span><span class="${cls}"><span class="id"${style}>${t}</span>` +
+      `<span class="tx">${show(textOf(t, f.rules))}</span></span>` +
+      (markR.has(i) ? '<span class="tag">delete</span>' : "") + `</span>` +
+      `<span class="ptr">-&gt;</span>`;
+  }
+  html += f.count > n ? `<span class="ptr">... ${f.count - n} more nodes ... -&gt; nullptr</span>`
+                      : `<span class="ptr">nullptr</span>`;
+  $("list").innerHTML = html;
+}
+
+function drawPairs(f) {
+  const top = f.top;
+  const max = top.length ? top[0][2] : 1;
+  let html = "";
+  top.forEach((p, k) => {
+    const best = f.stage === "found" && p[0] === f.pair[0] && p[1] === f.pair[1];
+    html += `<div class="row${best ? " best" : ""}">` +
+      `<span class="name">${show(textOf(p[0], f.rules))} + ${show(textOf(p[1], f.rules))}</span>` +
+      `<span class="barw"><span class="bar" style="display:block;width:${100 * p[2] / max}%"></span></span>` +
+      `<span class="n">${p[2]}</span></div>`;
+  });
+  if (!top.length) html = "no pairs left";
+  $("pairs").innerHTML = html;
+}
+
+function drawVocab(f) {
+  const rules = f.rules;
+  if (!rules.length) {
+    $("vocab").innerHTML = "none yet: every token is one character (0 to 255)";
+    return;
+  }
+  let html = "<table>";
+  for (let i = rules.length - 1; i >= 0; i--) {
+    const id = 256 + i;
+    const r = rules[i];
+    let cls = id === selected ? "sel" : "";
+    if (i === rules.length - 1 && f.stage === "merged") cls += " new";
+    html += `<tr class="${cls}" data-id="${id}"><td>${id}</td><td>= ${r[0]} + ${r[1]}</td>` +
+      `<td>${show(textOf(id, rules))}</td></tr>`;
+  }
+  $("vocab").innerHTML = html + "</table>";
+  for (const tr of $("vocab").querySelectorAll("tr")) {
+    tr.onclick = () => { selected = Number(tr.dataset.id); draw(); };
+  }
+}
+
+// The steps decode_token takes with its stack, one row per pop.
+function drawTree(f) {
+  const rules = f.rules;
+  let id = selected;
+  if (id === null || id - 256 >= rules.length) id = 256 + rules.length - 1;
+  if (id < 256) { $("tree").textContent = "no rules yet"; return; }
+
+  const name = (t) => (t < 256 ? `'${plain(String.fromCharCode(t))}'` : String(t));
+  const stack = [id];               // the top is the end of the array
+  let text = "";
+  let rows = `<tr><td>start</td><td></td><td></td>` +
+             `<td>${id}</td><td>""</td></tr>`;
+  for (let step = 1; stack.length; step++) {
+    const t = stack.pop();
+    let what;
+    if (t < 256) {
+      text += String.fromCharCode(t);
+      what = '<span class="chr">character</span>';
+    } else {
+      const r = rules[t - 256];
+      stack.push(r[1], r[0]);
+      what = `${name(r[0])} + ${name(r[1])}`;
+    }
+    const top = stack.map(name).join(" ") || "empty";
+    rows += `<tr><td>${step}</td><td class="pop">${name(t)}</td><td>${what}</td>` +
+            `<td>${top}</td><td>"${plain(text)}"</td></tr>`;
+  }
+  $("tree").innerHTML = `<table><tr><th>step</th><th>pop</th><th>is</th>` +
+    `<th>stack, top last</th><th>text</th></tr>${rows}</table>` +
+    `<p class="note">A rule pushes its right part, then its left part, so the left part comes out first.</p>`;
+}
+
+// ------------------------------------------------------------ the log
+
+// The 5 most frequent pairs, most frequent first, ties to the smaller pair.
+function topPairs(tokens) {
+  const counts = new Map();
+  for (let i = 0; i + 1 < tokens.length; i++) {
+    const key = tokens[i] + "," + tokens[i + 1];
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const all = [...counts].map(([k, c]) => k.split(",").map(Number).concat(c));
+  all.sort((x, y) => y[2] - x[2] || x[0] - y[0] || x[1] - y[1]);
+  return all.slice(0, 5);
+}
+
+function countPair(tokens, a, b) {
+  let n = 0;
+  for (let i = 0; i + 1 < tokens.length; i++) {
+    if (tokens[i] === a && tokens[i + 1] === b) n++;
+  }
+  return n;
+}
+
+const nums = (words) => words.filter((w) => w !== "").map(Number);
+
+// Two pictures per merge: the list before it (with the pair to merge), and
+// the list after it.
+function load(text) {
+  frames.length = 0;
+  view = -1;
+  selected = null;
+  $("console").innerHTML = "";
+  let start = null, before = null, size = 0;
+  const rules = [];
+  let pending = null;            // the last "merge" line, waiting for its tokens
+  let ended = false;
+
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    const w = line.split(" ");
+    if (w[0] === "start") {
+      size = Number(w[1]);
+      start = nums(w.slice(2));
+      before = start;
+    } else if (w[0] === "rule") {
+      rules.push([Number(w[2]), Number(w[3])]);
+    } else if (w[0] === "merge") {
+      pending = { id: Number(w[1]), removed: Number(w[3]), size: Number(w[5]) };
+    } else if (w[0] === "tokens" && pending && before) {
+      const k = pending.id - 256;
+      const after = nums(w.slice(1));
+      const r = rules[k];
+      if (!r) continue;
+      frames.push({ stage: "found", tokens: before, count: before.length, size: size,
+                    rules: rules.slice(0, k), top: topPairs(before),
+                    pair: [r[0], r[1], countPair(before, r[0], r[1])] });
+      frames.push({ stage: "merged", tokens: after, count: after.length,
+                    size: pending.size, rules: rules.slice(0, k + 1),
+                    top: topPairs(after), removed: pending.removed });
+      before = after;
+      size = pending.size;
+      pending = null;
+    } else if (line.startsWith("round trip")) {
+      ended = true;
+      consoleLine(line, line.endsWith("OK") ? "end" : "err");
+    } else if (line.startsWith("error")) {
+      consoleLine(line, "err");
+    } else if (/^\d+ merges:/.test(line)) {
+      consoleLine(line);
+    }
+  }
+
+  if (start === null) {
+    setStatus("this is not a bpe log: it has no start line", "bad");
+    draw();
+    return;
+  }
+  if (!ended) {
+    consoleLine("the log stops before the round trip: did bpe crash?", "err");
+  }
+  if (!frames.length) {
+    consoleLine("no merges in the log: did train() learn any rules?", "err");
+  }
+  view = 0;
+  setStatus(`${rules.length} rules, ${frames.length} pictures`, ended ? "done" : "bad");
+  $("drop").classList.add("small");
+  draw();
+}
+
+function readFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => load(reader.result);
+  reader.readAsText(file);
+}
+
+// ------------------------------------------------------------ controls
+
+function setStatus(text, cls) {
+  $("status").textContent = text;
+  $("status").className = cls || "";
+}
+
+function next() {
+  if (view < frames.length - 1) {
+    view++;
+    draw();
+  } else if (playing) {
+    togglePlay();
+  }
+}
+
+function back() {
+  if (view > 0) { view--; draw(); }
+}
+
+function togglePlay() {
+  if (playing) {
+    clearInterval(playing);
+    playing = null;
+    $("play").textContent = "play";
+  } else {
+    playing = setInterval(next, Number($("speed").value));
+    $("play").textContent = "pause";
+  }
+  draw();
+}
+
+function consoleLine(text, cls) {
+  const div = document.createElement("div");
+  if (cls) div.className = cls;
+  div.textContent = text;
+  $("console").appendChild(div);
+}
+
+$("next").onclick = next;
+$("back").onclick = back;
+$("play").onclick = togglePlay;
+$("speed").onchange = () => { if (playing) { togglePlay(); togglePlay(); } };
+document.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT") return;
+  if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); next(); }
+  if (e.key === "ArrowLeft") { e.preventDefault(); back(); }
+});
+
+const drop = $("drop");
+drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", (e) => {
+  e.preventDefault();
+  drop.classList.remove("over");
+  if (e.dataTransfer.files.length) readFile(e.dataTransfer.files[0]);
+});
+$("pick").addEventListener("change", (e) => {
+  if (e.target.files.length) readFile(e.target.files[0]);
+});
+</script>
+</body>
+</html>
