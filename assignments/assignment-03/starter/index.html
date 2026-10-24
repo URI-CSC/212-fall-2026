@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Digit Reader</title>
+<!--
+  index.html -- the web page for digits.  Written for you.  Do not change it.
+  ./digits serve sends this page to the browser.  Every guess, every vote and
+  every neighbor shown here comes from your knn.cpp.
+
+  Your drawing is turned into a 28 x 28 image the way MNIST's digits were
+  made: the ink is cropped, scaled to fit a 20 x 20 box, and moved so its
+  center of mass is in the middle of the image.
+-->
+<style>
+:root {
+  --bg: #f6f6f4; --panel: #ffffff; --ink: #1d1d1f; --muted: #6b6b70;
+  --line: #e2e2de; --accent: #2f5fd0; --accent-soft: #e6edfb; --bar: #9db4ea;
+  --good: #1e7a3a; --bad: #b3261e;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161618; --panel: #1f1f22; --ink: #ececef; --muted: #9a9aa2;
+    --line: #323238; --accent: #7fa2ff; --accent-soft: #26304a; --bar: #4a63a8;
+    --good: #6fd08c; --bad: #ff8a80;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 940px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+.sub { color: var(--muted); margin: 0 0 20px; }
+.panel {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 16px; margin-bottom: 16px;
+}
+.label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;
+         color: var(--muted); margin-bottom: 8px; }
+.top { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 680px) { .top { grid-template-columns: minmax(0, 1fr); } }
+#pad {
+  width: 100%; max-width: 280px; aspect-ratio: 1; display: block; touch-action: none;
+  background: #fff; border: 1px solid var(--line); border-radius: 8px; cursor: crosshair;
+}
+.row { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-top: 10px; }
+select, button {
+  font: inherit; color: var(--ink); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; cursor: pointer;
+}
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.guess { display: flex; align-items: center; gap: 20px; }
+#guess { font: 600 88px/1 Georgia, serif; min-width: 70px; text-align: center; }
+.seen { text-align: center; }
+.seen canvas, .thumb canvas, .gallery canvas {
+  image-rendering: pixelated; background: #fff; border: 1px solid var(--line); border-radius: 4px;
+}
+.small { color: var(--muted); font-size: 13px; }
+.votes { display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; align-items: end;
+         height: 110px; margin-top: 16px; }
+.vote { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+.vote .fill { width: 100%; background: var(--bar); border-radius: 3px 3px 0 0; min-height: 2px; }
+.vote.win .fill { background: var(--accent); }
+.vote span { font-variant-numeric: tabular-nums; font-size: 13px; margin-top: 4px; }
+.thumbs, .gallery { display: flex; flex-wrap: wrap; gap: 12px; }
+.thumb, .gallery figure { margin: 0; text-align: center; font-size: 13px; }
+.thumb b { font-size: 16px; }
+.gallery figure .wrong { color: var(--bad); font-weight: 600; }
+.error { color: var(--bad); }
+h2 { font-size: 18px; margin: 0 0 4px; letter-spacing: -0.01em; }
+.part { margin: 28px 0 14px; }
+.part.first { margin-top: 8px; }
+.part p { color: var(--muted); margin: 0; max-width: 680px; }
+.part.split { border-top: 1px solid var(--line); padding-top: 24px; margin-top: 36px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Digit Reader</h1>
+  <p class="sub" id="sub">Your <code>knn.cpp</code> reads handwritten digits.</p>
+
+  <div class="part first">
+    <h2>Part 1: Your drawing</h2>
+    <p>Draw one digit. Your model compares it with every training digit, keeps
+    the k closest, and lets them vote. The closest ones are shown below the
+    answer: they are the reason for it.</p>
+  </div>
+
+  <div class="top">
+    <section class="panel">
+      <div class="label">Draw one digit, 0 to 9</div>
+      <canvas id="pad" width="280" height="280"></canvas>
+      <div class="row">
+        <button id="clear">Clear</button>
+        <label>neighbors k
+          <select id="k"><option>1</option><option selected>3</option><option>5</option>
+            <option>7</option><option>9</option></select>
+        </label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="label">Your model's answer</div>
+      <div class="guess">
+        <div id="guess">?</div>
+        <div class="seen">
+          <canvas id="seen" width="28" height="28" style="width:112px;height:112px"></canvas>
+          <div class="small">what the model sees</div>
+        </div>
+        <div class="small" id="info"></div>
+      </div>
+      <div class="votes" id="votes"></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="label">Why: the closest training digits</div>
+    <div class="thumbs" id="thumbs"><span class="small">Draw something first.</span></div>
+  </section>
+
+  <div class="part split">
+    <h2>Part 2: The test set</h2>
+    <p>This part does not use your drawing. MNIST keeps 10,000 test digits
+    apart from the 60,000 training ones, so the model has never seen them. Your
+    model reads the first ones you choose, and shows every digit it gets wrong,
+    with the right answer. Each digit takes one full search of the training
+    set, so 1,000 digits take several seconds.</p>
+  </div>
+
+  <section class="panel">
+    <div class="label">Test digits it reads wrong</div>
+    <div class="row" style="margin-top:0">
+      <label>read the first
+        <select id="check"><option>100</option><option selected>300</option>
+          <option>1000</option></select>
+        test digits
+      </label>
+      <button id="mistakes" class="primary">Find mistakes</button>
+      <span class="small" id="mstatus"></span>
+    </div>
+    <div class="gallery" id="gallery" style="margin-top:12px"></div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const SIDE = 28;
+
+// ------------------------------------------------------------- drawing ----
+const pad = $("pad");
+const ctx = pad.getContext("2d");
+function blank() {
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, pad.width, pad.height);
+}
+blank();
+ctx.lineCap = "round";
+ctx.lineJoin = "round";
+ctx.lineWidth = 22;
+ctx.strokeStyle = "#000";
+
+let drawing = false;
+let last = null;
+function point(e) {
+  const r = pad.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * pad.width / r.width,
+           y: (e.clientY - r.top) * pad.height / r.height };
+}
+pad.addEventListener("pointerdown", (e) => {
+  drawing = true;
+  pad.setPointerCapture(e.pointerId);
+  last = point(e);
+  ctx.beginPath();
+  ctx.arc(last.x, last.y, ctx.lineWidth / 2, 0, 2 * Math.PI);
+  ctx.fillStyle = "#000";
+  ctx.fill();
+});
+pad.addEventListener("pointermove", (e) => {
+  if (!drawing) return;
+  const p = point(e);
+  ctx.beginPath();
+  ctx.moveTo(last.x, last.y);
+  ctx.lineTo(p.x, p.y);
+  ctx.stroke();
+  last = p;
+  soon();
+});
+pad.addEventListener("pointerup", () => { drawing = false; classify(); });
+$("clear").onclick = () => { blank(); reset(); };
+$("k").onchange = () => classify();
+
+// The drawing as MNIST would have stored it: 784 values, 0 white, 255 ink.
+function toMnist() {
+  const src = ctx.getImageData(0, 0, pad.width, pad.height).data;
+  let minX = pad.width, minY = pad.height, maxX = -1, maxY = -1;
+  for (let y = 0; y < pad.height; y++) {
+    for (let x = 0; x < pad.width; x++) {
+      if (src[4 * (y * pad.width + x)] < 128) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < 0) return null;
+  const w = maxX - minX + 1, h = maxY - minY + 1;
+  const scale = 20 / Math.max(w, h);
+  const small = document.createElement("canvas");
+  small.width = small.height = SIDE;
+  const s = small.getContext("2d");
+  const place = (dx, dy) => {
+    s.fillStyle = "#fff";
+    s.fillRect(0, 0, SIDE, SIDE);
+    s.imageSmoothingEnabled = true;
+    s.imageSmoothingQuality = "high";
+    s.drawImage(pad, minX, minY, w, h, dx, dy, w * scale, h * scale);
+    const d = s.getImageData(0, 0, SIDE, SIDE).data;
+    const out = new Array(SIDE * SIDE);
+    for (let i = 0; i < SIDE * SIDE; i++) out[i] = 255 - d[4 * i];
+    return out;
+  };
+  let dx = (SIDE - w * scale) / 2, dy = (SIDE - h * scale) / 2;
+  let px = place(dx, dy);
+  let sum = 0, cx = 0, cy = 0;
+  for (let i = 0; i < SIDE * SIDE; i++) {
+    sum += px[i];
+    cx += px[i] * (i % SIDE);
+    cy += px[i] * Math.floor(i / SIDE);
+  }
+  if (sum > 0) px = place(dx + (SIDE - 1) / 2 - cx / sum, dy + (SIDE - 1) / 2 - cy / sum);
+  return px;
+}
+
+// ------------------------------------------------------------- showing ----
+function paint(canvas, pixels) {
+  const c = canvas.getContext("2d");
+  const img = c.createImageData(SIDE, SIDE);
+  for (let i = 0; i < SIDE * SIDE; i++) {
+    const v = 255 - pixels[i];
+    img.data[4 * i] = img.data[4 * i + 1] = img.data[4 * i + 2] = v;
+    img.data[4 * i + 3] = 255;
+  }
+  c.putImageData(img, 0, 0);
+}
+
+function tiny(pixels, size) {
+  const c = document.createElement("canvas");
+  c.width = c.height = SIDE;
+  c.style.width = c.style.height = size + "px";
+  paint(c, pixels);
+  return c;
+}
+
+function showVotes(votes, winner) {
+  const box = $("votes");
+  box.innerHTML = "";
+  const most = Math.max(1, ...votes);
+  votes.forEach((v, d) => {
+    const col = document.createElement("div");
+    col.className = "vote" + (d === winner && v > 0 ? " win" : "");
+    const fill = document.createElement("div");
+    fill.className = "fill";
+    fill.style.height = (100 * v / most * 0.8) + "%";
+    const label = document.createElement("span");
+    label.textContent = d + (v ? " (" + v + ")" : "");
+    col.append(fill, label);
+    box.appendChild(col);
+  });
+}
+
+function reset() {
+  $("guess").textContent = "?";
+  $("info").textContent = "";
+  paint($("seen"), new Array(SIDE * SIDE).fill(0));
+  showVotes(new Array(10).fill(0), -1);
+  $("thumbs").innerHTML = '<span class="small">Draw something first.</span>';
+}
+reset();
+
+function showError(where, err) {
+  where.innerHTML = "";
+  const span = document.createElement("span");
+  span.className = "error";
+  span.textContent = String(err.message).includes("fetch")
+    ? "The server is not responding. Did digits crash? Check the terminal."
+    : err.message;
+  where.appendChild(span);
+}
+
+// ------------------------------------------------------------ talking -----
+let busy = false, again = false, timer = null;
+function soon() {
+  if (timer) return;
+  timer = setTimeout(() => { timer = null; classify(); }, 150);
+}
+
+async function classify() {
+  const pixels = toMnist();
+  if (!pixels) { reset(); return; }
+  if (busy) { again = true; return; }
+  busy = true;
+  try {
+    const res = await fetch("/classify?k=" + $("k").value, { method: "POST", body: pixels.join(",") });
+    const text = await res.text();
+    if (!res.ok) throw new Error(text);
+    const r = JSON.parse(text);
+    $("guess").textContent = r.guess >= 0 ? r.guess : "?";
+    paint($("seen"), r.pixels);
+    $("info").textContent = r.ms.toFixed(1) + " ms";
+    showVotes(r.votes, r.guess);
+    const box = $("thumbs");
+    box.innerHTML = "";
+    for (const n of r.neighbors) {
+      const f = document.createElement("figure");
+      f.className = "thumb";
+      f.appendChild(tiny(n.pixels, 84));
+      const cap = document.createElement("figcaption");
+      cap.innerHTML = "<b></b><br>";
+      cap.querySelector("b").textContent = "a " + n.label;
+      cap.append("#" + n.index + ", distance " + n.distance.toLocaleString());
+      f.appendChild(cap);
+      box.appendChild(f);
+    }
+  } catch (err) {
+    showError($("thumbs"), err);
+  }
+  busy = false;
+  if (again) { again = false; classify(); }
+}
+
+$("mistakes").onclick = async () => {
+  const check = $("check").value;
+  $("mstatus").textContent = "reading " + check + " test digits...";
+  $("gallery").innerHTML = "";
+  try {
+    const res = await fetch("/mistakes?check=" + check + "&k=" + $("k").value);
+    const r = JSON.parse(await res.text());
+    $("mstatus").textContent = r.wrong.length + " wrong out of " + r.checked
+      + " (" + (100 * (1 - r.wrong.length / r.checked)).toFixed(1) + "% right), with k = "
+      + $("k").value + " from Part 1";
+    for (const m of r.wrong) {
+      const f = document.createElement("figure");
+      f.appendChild(tiny(m.pixels, 70));
+      const cap = document.createElement("figcaption");
+      cap.innerHTML = 'a <b></b>, read as <span class="wrong"></span>';
+      cap.querySelector("b").textContent = m.label;
+      cap.querySelector(".wrong").textContent = m.guess;
+      f.appendChild(cap);
+      $("gallery").appendChild(f);
+    }
+  } catch (err) { showError($("mstatus"), err); }
+};
+
+fetch("/stats").then((r) => r.json()).then((s) => {
+  $("sub").textContent = "Your knn.cpp reads handwritten digits, by comparing them with "
+    + s.train.toLocaleString() + " training digits.";
+}).catch((err) => showError($("sub"), err));
+</script>
+</body>
+</html>
