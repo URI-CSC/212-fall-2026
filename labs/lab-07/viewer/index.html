@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recursion viewer (CSC 212)</title>
+<style>
+  body {
+    color-scheme: dark;
+    background: #14181d;
+    color: #d8dee9;
+    font-family: Menlo, Consolas, monospace;
+    margin: 0;
+    padding: 20px;
+  }
+  h1 { font-size: 16px; margin: 0 0 12px 0; font-weight: normal; }
+  h2 { font-size: 13px; font-weight: normal; color: #9aa7b8; margin: 0 0 8px 0; }
+  button {
+    background: #222a33; color: #d8dee9; border: 1px solid #4a5563;
+    border-radius: 4px; padding: 3px 9px; font-family: inherit; cursor: pointer;
+  }
+  button:disabled { opacity: 0.4; cursor: default; }
+  kbd { border: 1px solid #4a5563; border-radius: 3px; padding: 0 4px; font-size: 11px; }
+
+  #drop {
+    border: 2px dashed #4a5563; border-radius: 6px; padding: 28px;
+    text-align: center; color: #8b97a8; margin-bottom: 14px; max-width: 1200px;
+    box-sizing: border-box;
+  }
+  #drop.over { border-color: #7fb4ff; color: #7fb4ff; }
+  #drop.small { padding: 8px; font-size: 12px; }
+  #bar { margin-bottom: 12px; font-size: 13px; color: #9aa7b8; display: flex;
+         gap: 8px; align-items: center; flex-wrap: wrap; }
+  #status { margin-left: 8px; }
+  #status.done { color: #3fb950; }
+  #status.bad { color: #ff7b72; }
+
+  #explain {
+    border: 1px solid #2a323c; border-left: 3px solid #7fb4ff; border-radius: 6px;
+    padding: 10px 14px; font-size: 13px; line-height: 1.7; margin-bottom: 14px;
+    max-width: 1200px; min-height: 46px; box-sizing: border-box;
+  }
+  #explain code { background: #222a33; border-radius: 3px; padding: 0 4px; }
+  #explain .bad { color: #ff7b72; }
+  #explain .base { color: #e3b341; }
+
+  .panel { border: 1px solid #2a323c; border-radius: 6px; padding: 12px; margin-bottom: 14px; }
+  #grid { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; max-width: 1200px; }
+  #left { flex: 1; min-width: 260px; }
+  #right { flex: 2; min-width: 360px; }
+
+  /* the call stack, top first */
+  .frame {
+    border: 1px solid #2a323c; border-radius: 4px; padding: 6px 10px;
+    margin-bottom: 4px; font-size: 13px; background: #1c232b;
+  }
+  .frame.top { border-color: #7fb4ff; background: #1a2a3d; }
+  .frame .note { color: #8b97a8; font-size: 11px; }
+  .frame.top .note { color: #7fb4ff; }
+  .frame.base .note { color: #e3b341; }
+  #stackcount { color: #8b97a8; font-size: 12px; margin-top: 6px; }
+
+  /* the list */
+  #list { overflow-x: auto; padding-bottom: 4px; }
+  #list svg text { font-family: Menlo, Consolas, monospace; }
+  #output {
+    font-size: 15px; background: #1c232b; border-radius: 4px; padding: 8px 10px;
+    min-height: 22px; white-space: pre; overflow-x: auto;
+  }
+  #tree { overflow: auto; max-height: 460px; }
+  #tree svg text { font-family: Menlo, Consolas, monospace; }
+  .legend { font-size: 11px; color: #8b97a8; margin-top: 6px; }
+  .legend span { margin-right: 12px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<h1>Recursion viewer</h1>
+
+<div id="drop">Drop a log written by <code>./watch</code> here, or
+  <label style="color:#7fb4ff; cursor:pointer; text-decoration:underline">choose a file
+  <input type="file" id="file" class="hidden"></label>.</div>
+
+<div id="main" class="hidden">
+  <div id="bar">
+    <button id="first" title="first step (Home)">|&lt;</button>
+    <button id="prev" title="previous step (left arrow)">&lt;</button>
+    <button id="play" title="play / pause (space)">play</button>
+    <button id="next" title="next step (right arrow)">&gt;</button>
+    <button id="last" title="last step (End)">&gt;|</button>
+    <span id="where"></span>
+    <span id="status"></span>
+    <span style="margin-left:auto"><kbd>&larr;</kbd> <kbd>&rarr;</kbd> step,
+      <kbd>space</kbd> play</span>
+  </div>
+
+  <div id="explain"></div>
+
+  <div id="grid">
+    <div id="left">
+      <div class="panel">
+        <h2>Call stack (top is running)</h2>
+        <div id="stack"></div>
+        <div id="stackcount"></div>
+      </div>
+    </div>
+    <div id="right">
+      <div class="panel" id="listpanel">
+        <h2>The list</h2>
+        <div id="list"></div>
+      </div>
+      <div class="panel" id="outpanel">
+        <h2>Printed so far</h2>
+        <div id="output"></div>
+      </div>
+      <div class="panel">
+        <h2>Call tree (one circle per call)</h2>
+        <div id="tree"></div>
+        <div class="legend">
+          <span style="color:#7fb4ff">&#9679; running</span>
+          <span style="color:#d8dee9">&#9679; waiting on the stack</span>
+          <span style="color:#3fb950">&#9679; returned</span>
+          <span style="color:#4a5563">&#9675; not called yet</span>
+        </div>
+        <div class="legend">Green numbers: what each call should return, worked out from
+          the list. The last step checks what your code really returned.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+
+// ------------------------------------------------------------------ parsing
+// A log is a list of lines:
+//   title TEXT                  what was run
+//   list #1:3 #2:-5 #3:?:x      the list from its first node; :x = deleted
+//   call NAME ARG               a call starts; ARG is #id, null, or a number
+//   return NAME                 the most recent call returns
+//   out TEXT                    text printed by print or print_back
+//   result TEXT, calls N        at the end
+//   truncated                   the log was cut short
+
+function parseList(line) {
+  const nodes = [];
+  for (const part of line.split(" ").slice(1)) {
+    if (!part) continue;
+    const bits = part.split(":");
+    nodes.push({ id: Number(bits[0].slice(1)), data: bits[1], deleted: bits[2] === "x" });
+  }
+  return nodes;
+}
+
+function parse(text) {
+  const log = { title: "", result: null, calls: null, truncated: false, events: [], first: null, final: null };
+  for (const raw of text.split("\n")) {
+    const line = raw.replace(/\r$/, "");
+    const sp = line.indexOf(" ");
+    const kind = sp < 0 ? line : line.slice(0, sp);
+    const rest = sp < 0 ? "" : line.slice(sp + 1);
+    if (kind === "title") log.title = rest;
+    else if (kind === "result") log.result = rest;
+    else if (kind === "calls") log.calls = Number(rest);
+    else if (kind === "truncated") log.truncated = true;
+    else if (kind === "final") log.final = parseList(rest);
+    else if (kind === "list") {
+      const nodes = parseList(line);
+      if (log.events.length === 0) log.first = nodes;
+      else log.events[log.events.length - 1].list = nodes;
+    } else if (kind === "call") {
+      const s2 = rest.indexOf(" ");
+      log.events.push({ type: "call", name: rest.slice(0, s2), arg: rest.slice(s2 + 1) });
+    } else if (kind === "return") {
+      log.events.push({ type: "return", name: rest });
+    } else if (kind === "out") {
+      const last = log.events[log.events.length - 1];
+      if (last && last.type === "out" && !last.list) last.text += rest;
+      else log.events.push({ type: "out", text: rest });
+    }
+  }
+  return log;
+}
+
+// --------------------------------------------------------------- replaying
+// Every event is one step.  For each step we keep what the screen needs.
+
+let log = null, steps = [], calls = [], step = 0, timer = null;
+const dataOf = new Map(); // node id -> its value, as last seen
+
+function remember(list) {
+  for (const n of list || []) if (!n.deleted) dataOf.set(n.id, n.data);
+}
+
+function nodeText(arg) {
+  if (arg === "null") return "nullptr";
+  if (arg.startsWith("#")) {
+    const id = Number(arg.slice(1));
+    return dataOf.has(id) ? dataOf.get(id) : arg;
+  }
+  return arg;
+}
+
+function argText(name, arg) {
+  if (arg === "null") return "p = nullptr";
+  if (arg.startsWith("#")) return "p = node " + nodeText(arg);
+  return "n = " + arg;
+}
+
+// The answer of one call, worked out from the list, for the functions that
+// return a number.  Used to show what each call hands back to its caller.
+function answerOf(name, arg, list) {
+  if (name === "power" || name === "power_2") {
+    const m = log.title.match(/\((-?[\d.]+), /);
+    const b = m ? Number(m[1]) : 2;
+    const v = Math.pow(b, Number(arg));
+    return Math.abs(v) >= 1e9 ? v.toExponential(3) : String(v);
+  }
+  if (!["size", "sum", "max_slow", "max_fast"].includes(name)) return null;
+  let from = [];
+  if (arg !== "null") {
+    const id = Number(arg.slice(1));
+    const k = (list || []).findIndex((n) => n.id === id);
+    if (k < 0) return null;
+    from = list.slice(k).map((n) => Number(n.data));
+  }
+  if (name === "size") return String(from.length);
+  if (name === "sum") return String(from.reduce((a, b) => a + b, 0));
+  return from.length ? String(Math.max(...from)) : null;
+}
+
+function isBase(name, arg, list) {
+  if (arg === "null") return true;
+  if (name === "power" || name === "power_2") return arg === "0";
+  if (name === "max_slow" || name === "max_fast") {
+    const id = Number(arg.slice(1));
+    const k = (list || []).findIndex((n) => n.id === id);
+    return k >= 0 && k === list.length - 1;
+  }
+  return false;
+}
+
+function replay() {
+  steps = [];
+  calls = [];
+  dataOf.clear();
+  remember(log.first);
+  let stack = [], list = log.first || [], output = "";
+  const start = { stack: [], list, output: "", text: startText(), event: null, current: -1 };
+  steps.push(start);
+  for (const ev of log.events) {
+    let current = -1, text = "";
+    if (ev.type === "call") {
+      const c = {
+        id: calls.length, name: ev.name, arg: ev.arg,
+        parent: stack.length ? stack[stack.length - 1] : -1,
+        depth: stack.length, children: [],
+        base: isBase(ev.name, ev.arg, list),
+        answer: answerOf(ev.name, ev.arg, list),
+        label: nodeText(ev.arg), callStep: steps.length, returnStep: Infinity,
+      };
+      calls.push(c);
+      if (c.parent >= 0) calls[c.parent].children.push(c.id);
+      stack = stack.concat([c.id]);
+      current = c.id;
+      text = callText(c);
+    } else if (ev.type === "return") {
+      const id = stack[stack.length - 1];
+      const c = calls[id];
+      c.returnStep = steps.length;
+      stack = stack.slice(0, -1);
+      current = id;
+      if (ev.list) {
+        remember(ev.list);
+        text = returnText(c, list, ev.list, stack);
+        list = ev.list;
+      } else {
+        text = returnText(c, list, list, stack);
+      }
+    } else if (ev.type === "out") {
+      output += ev.text;
+      current = stack.length ? stack[stack.length - 1] : -1;
+      text = "The running call prints <code>" + escapeHtml(ev.text) + "</code>.";
+    }
+    steps.push({ stack, list, output, text, event: ev, current });
+  }
+  steps.push(endStep(list, output));
+}
+
+function startText() {
+  return "<b>" + escapeHtml(log.title) + "</b>. Nothing has been called yet. "
+    + "Step forward with <kbd>&rarr;</kbd>.";
+}
+
+function callText(c) {
+  const who = "<code>" + c.name + "(" + escapeHtml(argText(c.name, c.arg)) + ")</code>";
+  const where = c.parent < 0 ? "<code>main</code> calls " : "the call below it calls ";
+  let text = where + who + ". A new frame goes on top of the stack. ";
+  if (c.base) {
+    text += "<span class='base'>Base case:</span> ";
+    if (c.arg === "null") text += "the list is empty, so this call returns right away, with no more calls.";
+    else if (c.arg === "0") text += "n is 0, so this call returns right away, with no more calls.";
+    else text += "this is the last node, so this call returns right away, with no more calls.";
+  } else if (c.depth > 0) {
+    text += "The calls below it are paused, each one waiting for the call above it to return.";
+  }
+  return text;
+}
+
+// What a return changed in the list: a node it deleted, or a link it made.
+function listChange(before, after) {
+  const gone = after.find((n) => n.deleted && !(before.find((m) => m.id === n.id) || {}).deleted);
+  if (gone) return { deleted: gone };
+  const nextOf = (list) => {
+    const map = new Map();
+    list.forEach((n, k) => map.set(n.id, k + 1 < list.length ? list[k + 1].id : null));
+    return map;
+  };
+  const a = nextOf(before), b = nextOf(after);
+  for (const n of after) {
+    if (n.deleted || !a.has(n.id)) continue;
+    if (a.get(n.id) !== b.get(n.id)) return { linked: n, to: b.get(n.id) };
+  }
+  return null;
+}
+
+function valueOfId(id) {
+  return id === null ? "nullptr" : "node " + (dataOf.get(id) || "?");
+}
+
+function returnText(c, before, after, stack) {
+  const who = "<code>" + c.name + "(" + escapeHtml(argText(c.name, c.arg)) + ")</code>";
+  let text = who + " returns";
+  if (c.answer !== null) text += ". It should return <b>" + c.answer + "</b>";
+  text += ", and its frame is popped. ";
+  if (!c.children.length && !c.base) {
+    text += "<span class='base'>It made no recursive call: this was a base case.</span> ";
+  }
+  const change = listChange(before, after);
+  if (change && change.deleted) {
+    const v = dataOf.get(change.deleted.id) || "";
+    if (c.name === "clear") {
+      text += "<span class='bad'>It deleted node " + v + ".</span> ";
+    } else {
+      text += "<span class='bad'>It deleted node " + v + "</span>, and returns the rest of the list. "
+        + "The call below still points at node " + v + ", until it stores what came back. ";
+    }
+  } else if (change && change.linked) {
+    text += "Before returning, it linked in what came back: <b>node " + (dataOf.get(change.linked.id) || "")
+      + " now points at " + valueOfId(change.to) + "</b>. ";
+  }
+  if (stack.length) {
+    const below = calls[stack[stack.length - 1]];
+    text += "<code>" + below.name + "(" + escapeHtml(argText(below.name, below.arg))
+      + ")</code> continues, right after its recursive call.";
+  } else {
+    text += "That was the first call: back in <code>main</code>.";
+  }
+  return text;
+}
+
+function endStep(list, output) {
+  let text = "Done. <code>" + escapeHtml(log.result || "") + "</code>, with <b>"
+    + calls.length + "</b> call" + (calls.length === 1 ? "" : "s") + ".";
+  if (log.final) {
+    remember(log.final);
+    const start = log.final.length ? "node " + (dataOf.get(log.final[0].id) || "?") : "nullptr: the list is empty";
+    text += " <code>main</code> keeps what the first call returned: the list now starts at " + start + ".";
+    list = log.final;
+  }
+  const root = calls[0];
+  if (root && root.answer !== null && log.result) {
+    const got = log.result.split("=").pop().trim();
+    const same = Math.abs(Number(got) - Number(root.answer)) <= 1e-5 * Math.max(1, Math.abs(Number(root.answer)));
+    if (!same) {
+      text += " <span class='bad'>Your function returned " + escapeHtml(got)
+        + ", but the right answer is " + root.answer + ".</span>";
+    }
+  }
+  if (log.calls !== null && log.calls !== calls.length) {
+    text += " <span class='bad'>The log has " + calls.length + " calls, but WATCH counted "
+      + log.calls + ".</span>";
+  }
+  if (log.truncated) text += " <span class='bad'>The log was cut short: too many steps to show.</span>";
+  return { stack: [], list, output, text, event: null, current: -1 };
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/ /g, "&nbsp;");
+}
+
+// ------------------------------------------------------------------ drawing
+
+function svg(tag, attrs, text) {
+  let out = "<" + tag;
+  for (const k in attrs) out += " " + k + "=\"" + attrs[k] + "\"";
+  return text === undefined ? out + "/>" : out + ">" + text + "</" + tag + ">";
+}
+
+function drawStack(s) {
+  const box = $("stack");
+  box.innerHTML = "";
+  const ids = s.stack.slice().reverse();
+  ids.forEach((id, k) => {
+    const c = calls[id];
+    const div = document.createElement("div");
+    div.className = "frame" + (k === 0 ? " top" : "") + (c.base ? " base" : "");
+    let note = k === 0 ? (c.base ? "base case: answers directly" : "running")
+                       : "paused, waiting for the call above";
+    div.innerHTML = c.name + "(" + escapeHtml(argText(c.name, c.arg)) + ")"
+      + "<br><span class='note'>" + note + "</span>";
+    box.appendChild(div);
+  });
+  const main = document.createElement("div");
+  main.className = "frame";
+  main.innerHTML = "main<br><span class='note'>" + (ids.length ? "waiting" : "running") + "</span>";
+  box.appendChild(main);
+  $("stackcount").textContent = s.stack.length + " frame" + (s.stack.length === 1 ? "" : "s")
+    + " of recursion on the stack";
+}
+
+function drawList(s) {
+  const panel = $("listpanel");
+  if (!log.first && !s.list.length) { panel.classList.add("hidden"); return; }
+  panel.classList.remove("hidden");
+  const W = 64, H = 34, GAP = 34, X0 = 10, Y0 = 34;
+  const nodes = s.list;
+  // which frames point at which node
+  const pointers = new Map();
+  s.stack.forEach((id, depth) => {
+    const c = calls[id];
+    const key = c.arg === "null" ? "null" : c.arg;
+    if (!pointers.has(key)) pointers.set(key, []);
+    pointers.get(key).push(depth + 1);
+  });
+  let out = "";
+  nodes.forEach((n, k) => {
+    const x = X0 + k * (W + GAP);
+    const isTop = s.stack.length && calls[s.stack[s.stack.length - 1]].arg === "#" + n.id;
+    const color = n.deleted ? "#ff7b72" : isTop ? "#7fb4ff" : "#4a5563";
+    out += svg("rect", { x, y: Y0, width: W, height: H, rx: 4, fill: n.deleted ? "#3a1d1d" : "#1c232b",
+                         stroke: color, "stroke-width": isTop || n.deleted ? 2 : 1 });
+    const value = n.deleted ? (dataOf.get(n.id) || "?") : n.data;
+    out += svg("text", { x: x + W / 2, y: Y0 + 22, fill: n.deleted ? "#ff7b72" : "#d8dee9",
+                         "text-anchor": "middle", "font-size": 14 }, escapeHtml(value));
+    if (n.deleted) {
+      out += svg("text", { x: x + W / 2, y: Y0 + H + 16, fill: "#ff7b72", "text-anchor": "middle",
+                           "font-size": 11 }, "deleted");
+    } else if (k + 1 <= nodes.length) {
+      const ax = x + W, bx = x + W + GAP;
+      out += svg("line", { x1: ax, y1: Y0 + H / 2, x2: bx - 4, y2: Y0 + H / 2, stroke: "#8b97a8" });
+      out += svg("polygon", { points: (bx - 4) + "," + (Y0 + H / 2 - 4) + " " + bx + "," + (Y0 + H / 2)
+                              + " " + (bx - 4) + "," + (Y0 + H / 2 + 4), fill: "#8b97a8" });
+    }
+    const ps = pointers.get("#" + n.id);
+    if (ps) {
+      out += svg("text", { x: x + W / 2, y: Y0 - 10, fill: isTop ? "#7fb4ff" : "#8b97a8",
+                           "text-anchor": "middle", "font-size": 11 }, "p of call " + ps.join(", "));
+    }
+  });
+  const last = nodes.length && nodes[nodes.length - 1].deleted;
+  if (!last) {
+    const x = X0 + nodes.length * (W + GAP);
+    out += svg("text", { x: x + 4, y: Y0 + 22, fill: "#8b97a8", "font-size": 13 }, "nullptr");
+    const ps = pointers.get("null");
+    if (ps) out += svg("text", { x: x + 4, y: Y0 - 10, fill: "#e3b341", "font-size": 11 }, "p of call " + ps.join(", "));
+  }
+  const width = X0 + (nodes.length + 1) * (W + GAP) + 40;
+  $("list").innerHTML = "<svg width='" + width + "' height='" + (Y0 + H + 26) + "'>" + out + "</svg>";
+}
+
+function drawOutput(s) {
+  const panel = $("outpanel");
+  const prints = log.events.some((e) => e.type === "out")
+    || /^print/.test(log.title);
+  panel.classList.toggle("hidden", !prints);
+  $("output").textContent = s.output || "";
+}
+
+// Tree layout: leaves left to right in call order, each parent centered over
+// its children, one row per depth.
+let layout = null;
+function layoutTree() {
+  let next = 0;
+  const pos = new Array(calls.length);
+  function place(id) {
+    const c = calls[id];
+    if (!c.children.length) { pos[id] = next++; return; }
+    c.children.forEach(place);
+    pos[id] = (pos[c.children[0]] + pos[c.children[c.children.length - 1]]) / 2;
+  }
+  calls.filter((c) => c.parent < 0).forEach((c) => place(c.id));
+  const maxDepth = Math.max(0, ...calls.map((c) => c.depth));
+  layout = { pos, leaves: Math.max(1, next), maxDepth };
+}
+
+function drawTree(s) {
+  if (!calls.length) { $("tree").innerHTML = ""; return; }
+  const small = calls.length > 120;
+  const R = small ? 5 : 15, DX = small ? 14 : 44, DY = small ? 34 : 54, PAD = 22;
+  const width = PAD * 2 + (layout.leaves - 1) * DX + 2 * R + 60;
+  const height = PAD * 2 + layout.maxDepth * DY + 2 * R;
+  const xy = (c) => [PAD + R + layout.pos[c.id] * DX, PAD + R + c.depth * DY];
+  const at = steps.indexOf(s);
+  const onStack = new Set(s.stack);
+  let out = "";
+  for (const c of calls) {
+    if (c.parent < 0 || c.callStep > at) continue;
+    const [x1, y1] = xy(calls[c.parent]), [x2, y2] = xy(c);
+    out += svg("line", { x1, y1, x2, y2, stroke: "#4a5563" });
+  }
+  for (const c of calls) {
+    const [x, y] = xy(c);
+    let fill = "none", stroke = "#2a323c", text = "#4a5563";
+    if (c.callStep <= at) {
+      if (c.returnStep <= at) { fill = "#163a22"; stroke = "#3fb950"; text = "#8ddb9f"; }
+      else if (onStack.has(c.id)) { fill = "#1c232b"; stroke = "#d8dee9"; text = "#d8dee9"; }
+      if (s.current === c.id && c.returnStep > at) { fill = "#1a2a3d"; stroke = "#7fb4ff"; text = "#d8dee9"; }
+    }
+    out += svg("circle", { cx: x, cy: y, r: R, fill, stroke, "stroke-width": s.current === c.id ? 3 : 1.5 });
+    if (!small) {
+      const label = c.arg === "null" ? "null" : c.label;
+      out += svg("text", { x, y: y + 4, fill: text, "text-anchor": "middle", "font-size": 11 },
+                 escapeHtml(label));
+      if (c.returnStep <= at && c.answer !== null) {
+        out += svg("text", { x: x + R + 3, y: y - R + 6, fill: "#3fb950", "font-size": 10 },
+                   escapeHtml(c.answer));
+      }
+    }
+  }
+  $("tree").innerHTML = "<svg width='" + width + "' height='" + height + "'>" + out + "</svg>";
+}
+
+function show() {
+  const s = steps[step];
+  $("explain").innerHTML = s.text;
+  $("where").textContent = "step " + step + " of " + (steps.length - 1);
+  drawStack(s);
+  drawList(s);
+  drawOutput(s);
+  drawTree(s);
+  $("first").disabled = $("prev").disabled = step === 0;
+  $("next").disabled = $("last").disabled = step === steps.length - 1;
+}
+
+function go(k) {
+  step = Math.max(0, Math.min(steps.length - 1, k));
+  show();
+}
+
+function play() {
+  if (timer) { clearInterval(timer); timer = null; $("play").textContent = "play"; return; }
+  if (step === steps.length - 1) step = 0;
+  $("play").textContent = "pause";
+  timer = setInterval(() => {
+    if (step >= steps.length - 1) { play(); return; }
+    go(step + 1);
+  }, 700);
+}
+
+function load(text, name) {
+  log = parse(text);
+  if (!log.title && !log.events.length) {
+    $("status").className = "bad";
+    $("status").textContent = name + " is not a log from ./watch.";
+    $("main").classList.remove("hidden");
+    return;
+  }
+  replay();
+  layoutTree();
+  $("drop").classList.add("small");
+  $("drop").innerHTML = "Showing <b>" + escapeHtml(name) + "</b>. Drop another log to replace it.";
+  $("main").classList.remove("hidden");
+  $("status").className = log.result ? "done" : "bad";
+  $("status").textContent = log.result ? calls.length + " calls"
+    : "the log ends early: did ./watch crash?";
+  step = 0;
+  show();
+}
+
+// ------------------------------------------------------------------- input
+
+$("first").onclick = () => go(0);
+$("prev").onclick = () => go(step - 1);
+$("next").onclick = () => go(step + 1);
+$("last").onclick = () => go(steps.length - 1);
+$("play").onclick = play;
+document.addEventListener("keydown", (e) => {
+  if (!steps.length) return;
+  if (e.key === "ArrowRight") go(step + 1);
+  else if (e.key === "ArrowLeft") go(step - 1);
+  else if (e.key === "Home") go(0);
+  else if (e.key === "End") go(steps.length - 1);
+  else if (e.key === " ") { e.preventDefault(); play(); }
+});
+
+function readFile(f) {
+  const reader = new FileReader();
+  reader.onload = () => load(reader.result, f.name);
+  reader.readAsText(f);
+}
+$("file").onchange = (e) => { if (e.target.files[0]) readFile(e.target.files[0]); };
+document.addEventListener("dragover", (e) => { e.preventDefault(); $("drop").classList.add("over"); });
+document.addEventListener("dragleave", () => $("drop").classList.remove("over"));
+document.addEventListener("drop", (e) => {
+  e.preventDefault();
+  $("drop").classList.remove("over");
+  if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]);
+});
+</script>
+</body>
+</html>
