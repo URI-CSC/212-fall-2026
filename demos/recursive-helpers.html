@@ -82,6 +82,12 @@ header { padding: 14px 16px 4px; max-width: 1500px; margin: 0 auto; }
 h1 { font-size: 1.35rem; margin: 0 0 4px; }
 .idea { margin: 0; color: var(--muted); }
 .idea b { color: var(--ink); }
+.help { margin-top: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; font-size: 0.92rem; }
+.help summary { cursor: pointer; font-weight: 600; }
+.help ol { margin: 8px 0 4px; padding-left: 1.4em; }
+.help li { margin: 3px 0; }
+.help ul { margin: 3px 0; padding-left: 1.2em; }
+.help p { margin: 6px 0 4px; color: var(--muted); }
 .controls { max-width: 1500px; margin: 0 auto; padding: 8px 16px; }
 .row { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-bottom: 8px; }
 label { display: inline-flex; gap: 6px; align-items: center; font-size: 0.95rem; }
@@ -208,6 +214,24 @@ svg text { fill: var(--ink); font-family: ui-monospace, "SF Mono", Menlo, Consol
   <h1>Recursive helpers that return a pointer</h1>
   <p class="idea">Each call returns the <b>first node</b> (list) or the <b>root</b> (tree) of its part of the structure <b>after</b> the change.
   The caller stores that pointer back into the link it came from. Most of the time it is the same pointer; once in a while it is not.</p>
+  <details class="help">
+    <summary>How to use this demo</summary>
+    <ol>
+      <li>Pick an <b>Operation</b>, then click one of the buttons next to <b>Try</b> to load an example.</li>
+      <li>Step through the trace with <b>Next</b> and <b>Prev</b>, or with the Left and Right arrow keys. <b>Play</b> runs the trace on its own; the slider sets the speed.</li>
+      <li>Watch three things together:
+        <ul>
+          <li><b>Code</b>: the highlighted line is the one running now</li>
+          <li><b>Call stack</b>: one box per call; the top box is the call running now</li>
+          <li><b>Memory</b>: the nodes and pointers; the <code>#k</code> badge marks the node <code>p</code> of call <code>#k</code></li>
+        </ul>
+      </li>
+      <li>Each time a call returns, its pointer moves up to the link that stores it: <b>gray</b> means the same pointer is stored back and nothing changes; <b>orange</b> means the link really changes.</li>
+      <li>Turn on <b>Forget to store the result (bug)</b> and run the same example again. You can see what goes wrong when the code ignores the returned pointer.</li>
+      <li>Type your own keys in the input boxes and click <b>Trace it</b>.</li>
+    </ol>
+    <p><b>Tip:</b> before you click <b>Next</b>, predict what the current call will return and which link will change. Then check.</p>
+  </details>
 </header>
 
 <section class="controls">
