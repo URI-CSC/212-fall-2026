@@ -1,0 +1,1141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recursive Helper Tracer</title>
+<style>
+:root {
+  --bg: #f7f6f2;
+  --panel: #ffffff;
+  --ink: #1d1d1f;
+  --muted: #6b6b70;
+  --line: #dcd9d1;
+  --code-bg: #f3f1eb;
+  --hl: #ffeeb0;
+  --node: #ffffff;
+  --edge: #4b4e55;
+  --cur: #2563eb;
+  --same: #8a94a6;
+  --changed: #e8740c;
+  --lost: #d1242f;
+  --new: #1a8f4a;
+  --succ: #7c3aed;
+  --new-bg: #e7f6ec;
+  --del-bg: #fde8e8;
+  --succ-bg: #f0e9fe;
+  --btn: #ecebe6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17181b;
+    --panel: #212327;
+    --ink: #ececec;
+    --muted: #a0a3aa;
+    --line: #3a3d44;
+    --code-bg: #1b1d21;
+    --hl: #4a3f12;
+    --node: #2a2d33;
+    --edge: #c4c7ce;
+    --cur: #6ea0ff;
+    --same: #8f9bb0;
+    --changed: #ff9640;
+    --lost: #ff5c66;
+    --new: #43c776;
+    --succ: #b18cff;
+    --new-bg: #183524;
+    --del-bg: #3d1d20;
+    --succ-bg: #2c2240;
+    --btn: #30333a;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17181b;
+  --panel: #212327;
+  --ink: #ececec;
+  --muted: #a0a3aa;
+  --line: #3a3d44;
+  --code-bg: #1b1d21;
+  --hl: #4a3f12;
+  --node: #2a2d33;
+  --edge: #c4c7ce;
+  --cur: #6ea0ff;
+  --same: #8f9bb0;
+  --changed: #ff9640;
+  --lost: #ff5c66;
+  --new: #43c776;
+  --succ: #b18cff;
+  --new-bg: #183524;
+  --del-bg: #3d1d20;
+  --succ-bg: #2c2240;
+  --btn: #30333a;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+code, pre, .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+header { padding: 14px 16px 4px; max-width: 1500px; margin: 0 auto; }
+h1 { font-size: 1.35rem; margin: 0 0 4px; }
+.idea { margin: 0; color: var(--muted); }
+.idea b { color: var(--ink); }
+.controls { max-width: 1500px; margin: 0 auto; padding: 8px 16px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-bottom: 8px; }
+label { display: inline-flex; gap: 6px; align-items: center; font-size: 0.95rem; }
+input[type=text], select {
+  font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--panel); color: var(--ink);
+}
+#struct { width: 17em; }
+#key { width: 4.5em; }
+button {
+  font: inherit; font-size: 0.92rem; padding: 5px 11px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--btn); color: var(--ink); cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--cur); color: #fff; border-color: var(--cur); }
+.bug { padding: 4px 10px; border: 1px dashed var(--lost); border-radius: 6px; }
+.bug input { accent-color: var(--lost); }
+.presets button { font-size: 0.85rem; }
+.presets .lbl { color: var(--muted); font-size: 0.85rem; }
+main {
+  max-width: 1500px; margin: 0 auto; padding: 0 16px 24px;
+  display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 14px;
+}
+.col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+.panel h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 6px; }
+.panel h2 .sub { text-transform: none; letter-spacing: 0; }
+#code { margin: 0; background: var(--code-bg); border-radius: 6px; padding: 6px 0; overflow-x: auto; font-size: 0.86rem; }
+.ln { padding: 0 10px 0 0; white-space: pre; border-left: 4px solid transparent; }
+.ln .no { display: inline-block; width: 2.4em; text-align: right; padding-right: 0.8em; color: var(--muted); user-select: none; }
+.ln.hl { background: var(--hl); border-left-color: var(--changed); }
+.ln .c { color: var(--muted); }
+.ln.bugline .code { color: var(--lost); }
+.ln.bugline .c { color: var(--lost); font-weight: 600; }
+#stack { display: flex; flex-direction: column; gap: 6px; }
+.frame { border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px; font-size: 0.88rem; }
+.frame.top { border: 2px solid var(--cur); }
+.frame.wrapper { border-style: dashed; }
+.frame .fh { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.frame .got, .frame .ret { margin-top: 3px; padding-left: 2px; }
+.frame .got { color: var(--changed); font-weight: 600; }
+.frame .ret { color: var(--new); font-weight: 600; }
+.badge {
+  display: inline-block; min-width: 1.9em; text-align: center; border-radius: 999px;
+  background: var(--muted); color: var(--panel); font-size: 0.78rem; font-weight: 700; padding: 0 5px;
+}
+.frame.top .badge { background: var(--cur); }
+.empty { color: var(--muted); font-style: italic; }
+#mem { width: 100%; height: auto; max-height: 62vh; display: block; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { display: inline-block; width: 22px; height: 0; border-top: 4px solid; }
+.sw.box { width: 14px; height: 14px; border: 3px solid; border-radius: 3px; }
+.player { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.player .speed { margin-left: auto; color: var(--muted); font-size: 0.85rem; }
+.caption { font-size: 1.05rem; min-height: 6.5em; }
+.stepno { color: var(--muted); font-size: 0.85rem; margin-bottom: 4px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.chip { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; color: #fff; }
+.chip.same, .chip.ignored { background: var(--same); }
+.chip.changed { background: var(--changed); }
+.chip.lost, .chip.broken { background: var(--lost); }
+.chip.done, .chip.lucky { background: var(--new); }
+.err { color: var(--lost); font-weight: 600; }
+.hint { color: var(--muted); font-size: 0.8rem; }
+
+/* SVG */
+svg text { fill: var(--ink); font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+.node rect { fill: var(--node); stroke: var(--edge); stroke-width: 2; }
+.node .key { font-size: 17px; font-weight: 700; }
+.node .addr { font-size: 11px; fill: var(--muted); }
+.node .tag { font-size: 11px; font-weight: 700; }
+.node.cur rect { stroke: var(--cur); stroke-width: 4; }
+.node.h-new rect { stroke: var(--new); stroke-width: 3.5; fill: var(--new-bg); }
+.node.h-succ rect { stroke: var(--succ); stroke-width: 3.5; fill: var(--succ-bg); }
+.node.h-del rect { stroke: var(--lost); stroke-width: 3.5; fill: var(--del-bg); }
+.node.float rect { stroke: var(--new); stroke-dasharray: 6 4; }
+.node.float .tag { fill: var(--new); }
+.node.leak rect { stroke: var(--lost); stroke-width: 3; stroke-dasharray: 6 4; fill: var(--del-bg); }
+.node.leak .tag { fill: var(--lost); }
+.node.ghost { opacity: 0.6; }
+.node.ghost rect { stroke: var(--lost); stroke-dasharray: 5 4; fill: none; }
+.node.ghost .tag { fill: var(--lost); }
+.node .x { stroke: var(--lost); stroke-width: 2.5; }
+.node .div { stroke: var(--edge); stroke-width: 1.5; }
+.slot { fill: var(--edge); }
+.nslot { fill: none; stroke: var(--muted); stroke-width: 1.5; }
+.nslash { stroke: var(--muted); stroke-width: 1.5; }
+.e { fill: none; stroke-width: 2.2; }
+.e-normal { stroke: var(--edge); }
+.e-same { stroke: var(--same); stroke-width: 5; }
+.e-changed { stroke: var(--changed); stroke-width: 5; }
+.e-lost { stroke: var(--lost); stroke-width: 3.5; stroke-dasharray: 8 5; }
+.e-dangle { stroke: var(--lost); stroke-width: 3; stroke-dasharray: 8 5; }
+.e-ghost { stroke: var(--edge); opacity: 0.3; stroke-dasharray: 3 4; }
+.ah-normal path, .ah-ghost path { fill: var(--edge); }
+.ah-same path { fill: var(--same); }
+.ah-changed path { fill: var(--changed); }
+.ah-lost path, .ah-dangle path { fill: var(--lost); }
+.var rect { fill: var(--code-bg); stroke: var(--muted); stroke-width: 1.5; }
+.var text { font-size: 14px; font-weight: 700; }
+.var.hlv rect { stroke: var(--changed); stroke-width: 3; }
+.nul { font-size: 12px; fill: var(--muted); }
+.size { font-size: 13px; fill: var(--muted); }
+.fbadge circle { fill: var(--muted); }
+.fbadge.top circle { fill: var(--cur); }
+.fbadge text { fill: #fff; font-size: 11px; font-weight: 700; }
+.token rect { stroke-width: 2; }
+.token text { font-size: 13px; font-weight: 700; fill: #fff; }
+.tk-same rect, .tk-ignored rect { fill: var(--same); stroke: var(--same); }
+.tk-changed rect { fill: var(--changed); stroke: var(--changed); }
+.tk-lost rect { fill: var(--lost); stroke: var(--lost); }
+.tk-lost .strike { stroke: #fff; stroke-width: 2; }
+.tk-note { font-size: 12px; font-weight: 700; }
+.tk-note.lost, .tk-note.ignored { fill: var(--lost); }
+
+@media (max-width: 900px) {
+  main { grid-template-columns: minmax(0, 1fr); }
+  .player .speed { margin-left: 0; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Recursive helpers that return a pointer</h1>
+  <p class="idea">Each call returns the <b>first node</b> (list) or the <b>root</b> (tree) of its part of the structure <b>after</b> the change.
+  The caller stores that pointer back into the link it came from. Most of the time it is the same pointer; once in a while it is not.</p>
+</header>
+
+<section class="controls">
+  <div class="row">
+    <label>Operation
+      <select id="op">
+        <option value="list">List: remove_r</option>
+        <option value="insert">BST: insert_helper</option>
+        <option value="remove">BST: remove_helper</option>
+      </select>
+    </label>
+    <label><span id="structLbl">Keys</span> <input type="text" id="struct"></label>
+    <label><span id="keyLbl">Key</span> <input type="text" id="key"></label>
+    <button id="run" class="primary">Trace it</button>
+    <label class="bug"><input type="checkbox" id="bug"> Forget to store the result (bug)</label>
+  </div>
+  <div class="row presets" id="presets"></div>
+</section>
+
+<main>
+  <div class="col">
+    <div class="panel">
+      <h2>Code</h2>
+      <pre id="code"></pre>
+    </div>
+    <div class="panel">
+      <h2>Call stack <span class="sub">(top = running now; #k matches the badge in memory)</span></h2>
+      <div id="stack"></div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="panel">
+      <h2>Memory</h2>
+      <svg id="mem" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Memory diagram"></svg>
+      <div class="legend">
+        <span><i class="sw" style="border-color: var(--same)"></i>same pointer stored back</span>
+        <span><i class="sw" style="border-color: var(--changed)"></i>link changed</span>
+        <span><i class="sw" style="border-color: var(--lost); border-top-style: dashed"></i>result ignored / dangling</span>
+        <span><i class="sw box" style="border-color: var(--cur)"></i>p of the running frame</span>
+        <span><i class="sw box" style="border-color: var(--new)"></i>node being returned</span>
+        <span><i class="sw box" style="border-color: var(--succ)"></i>successor</span>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="player">
+        <button id="first" title="First step (Home)">|&lt; First</button>
+        <button id="prev" title="Previous step (Left arrow)">&lt; Prev</button>
+        <button id="play" title="Play / pause (Space)">Play</button>
+        <button id="next" title="Next step (Right arrow)">Next &gt;</button>
+        <button id="last" title="Last step (End)">Last &gt;|</button>
+        <label class="speed">Speed <input type="range" id="speed" min="400" max="3000" step="100" value="1600"></label>
+      </div>
+    </div>
+    <div class="panel caption">
+      <div class="stepno"><span id="stepno"></span><span id="chip"></span></div>
+      <div id="msg"></div>
+      <div class="hint">Keys: Left / Right to step, Space to play, Home / End.</div>
+    </div>
+  </div>
+</main>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------- code text
+// each line: [label, text, text when the bug toggle is on]
+const CODE = {
+  list: [
+    ["wsig", "void SLList::remove(int value) { // removes the first node holding value"],
+    ["wcall", "    m_head = remove_r(m_head, value); // the head may change too", "    remove_r(m_head, value); // BUG: result ignored"],
+    ["wempty", "    if (m_head == nullptr)"],
+    ["wtail", "        m_tail = nullptr; // the list is now empty"],
+    ["", "}"],
+    ["", ""],
+    ["sig", "SLList::Node* SLList::remove_r(Node* p, int value) {"],
+    ["base", "    if (p == nullptr)"],
+    ["retnull", "        return nullptr; // not found: nothing changes"],
+    ["match", "    if (p->data == value) {"],
+    ["rest", "        Node* rest = p->next;"],
+    ["del", "        delete p;"],
+    ["size", "        --m_size;"],
+    ["retrest", "        return rest; // the list without p"],
+    ["", "    }"],
+    ["rec", "    p->next = remove_r(p->next, value); // the new rest, linked in", "    remove_r(p->next, value); // BUG: result ignored"],
+    ["tail", "    if (p->next == nullptr) m_tail = p; // update tail if needed"],
+    ["retp", "    return p;"],
+    ["", "}"]
+  ],
+  insert: [
+    ["wsig", "void BST::insert(int key) {"],
+    ["wcall", "    m_root = insert_helper(m_root, key);", "    insert_helper(m_root, key); // BUG: result ignored"],
+    ["wsize", "    ++m_size;"],
+    ["", "}"],
+    ["", ""],
+    ["sig", "Node* BST::insert_helper(Node* p, int key) {"],
+    ["base", "    if (p == nullptr)"],
+    ["new", "        return new Node(key); // the new subtree is a single node"],
+    ["lt", "    if (key < p->key)"],
+    ["recl", "        p->left = insert_helper(p->left, key);", "        insert_helper(p->left, key); // BUG: result ignored"],
+    ["gt", "    else if (key > p->key)"],
+    ["recr", "        p->right = insert_helper(p->right, key);", "        insert_helper(p->right, key); // BUG: result ignored"],
+    ["retp", "    return p; // the root of this subtree does not change"],
+    ["", "}"]
+  ],
+  remove: [
+    ["wsig", "void BST::remove(int key) {"],
+    ["wcall", "    m_root = remove_helper(m_root, key);", "    remove_helper(m_root, key); // BUG: result ignored"],
+    ["", "}"],
+    ["", ""],
+    ["sig", "Node* BST::remove_helper(Node* p, int key) {"],
+    ["base", "    if (p == nullptr)"],
+    ["retnull", "        return nullptr; // the key is not in the tree"],
+    ["lt", "    if (key < p->key) {"],
+    ["recl", "        p->left = remove_helper(p->left, key);", "        remove_helper(p->left, key); // BUG: result ignored"],
+    ["gt", "    } else if (key > p->key) {"],
+    ["recr", "        p->right = remove_helper(p->right, key);", "        remove_helper(p->right, key); // BUG: result ignored"],
+    ["case12", "    } else if (p->left == nullptr || p->right == nullptr) { // cases 1 and 2"],
+    ["child", "        Node* child = (p->left != nullptr) ? p->left : p->right;"],
+    ["del", "        delete p;"],
+    ["size", "        --m_size;"],
+    ["retchild", "        return child; // nullptr for a leaf"],
+    ["case3", "    } else { // case 3: two children"],
+    ["copy", "        p->key = min_helper(p->right)->key; // copy the successor up"],
+    ["rec3", "        p->right = remove_helper(p->right, p->key); // and remove it below", "        remove_helper(p->right, p->key); // BUG: result ignored"],
+    ["", "    }"],
+    ["retp", "    return p;"],
+    ["", "}"]
+  ]
+};
+
+const TREE = "50 30 70 20 40 60 80 25 65 75";
+const LIST = "10 20 30 40";
+const OPS = {
+  list: {
+    kind: "list", structLabel: "List (head first)", keyLabel: "Remove",
+    presets: [
+      ["Head (10)", LIST, 10],
+      ["Middle (30)", LIST, 30],
+      ["Tail (40)", LIST, 40],
+      ["Not in list (25)", LIST, 25],
+      ["Only node (10)", "10", 10]
+    ]
+  },
+  insert: {
+    kind: "tree", structLabel: "Tree (keys in insert order)", keyLabel: "Insert",
+    presets: [
+      ["Deep leaf (55)", TREE, 55],
+      ["Under 25 (27)", TREE, 27],
+      ["Empty tree (50)", "", 50],
+      ["Duplicate (40)", TREE, 40]
+    ]
+  },
+  remove: {
+    kind: "tree", structLabel: "Tree (keys in insert order)", keyLabel: "Remove",
+    presets: [
+      ["Leaf, case 1 (40)", TREE, 40],
+      ["One child, case 2 (20)", TREE, 20],
+      ["Two children, case 3 (70)", TREE, 70],
+      ["Root, successor has a child (50)", TREE, 50],
+      ["Not in tree (45)", TREE, 45]
+    ]
+  }
+};
+
+// ---------------------------------------------------------------- simulator
+// H: heap of nodes by id, V: member variables, F: call stack
+let H, V, F, steps, nid, naddr, lastPos, hints, slots, prevRef, leaked, kind, bug, stats;
+
+const DX = 66, DY = 84, X0 = 160, Y0 = 120; // tree layout
+const NW = 56, NH = 40; // tree node box
+const LX0 = 110, LDX = 160, LY = 200; // list layout
+const LW = 108, LH = 44; // list node box
+
+function resetSim(k, b) {
+  H = {}; V = {}; F = []; steps = [];
+  nid = 1; naddr = 0x100;
+  lastPos = {}; hints = {}; slots = {};
+  prevRef = new Set(); leaked = new Set();
+  kind = k; bug = b;
+  stats = { wb: 0, same: 0, changed: 0, ignored: 0, lost: 0, topChanged: false };
+}
+
+function mk(key) {
+  const id = nid++;
+  H[id] = { id: id, addr: "0x" + naddr.toString(16), key: key, left: null, right: null, next: null, del: false };
+  naddr += 0x40;
+  return id;
+}
+
+function nm(id) {
+  if (id == null) return "nullptr";
+  const n = H[id];
+  return n.addr + " [" + n.key + (n.del ? ", deleted" : "") + "]";
+}
+
+function refs() {
+  const s = new Set();
+  for (const k of ["m_head", "m_tail", "m_root"]) if (V[k] != null) s.add(V[k]);
+  for (const id in H) {
+    const n = H[id];
+    if (n.del) continue;
+    for (const f of ["left", "right", "next"]) if (n[f] != null) s.add(n[f]);
+  }
+  return s;
+}
+
+function reach(throughDeleted) {
+  const s = new Set();
+  const st = [kind === "list" ? V.m_head : V.m_root];
+  while (st.length) {
+    const id = st.pop();
+    if (id == null || s.has(id)) continue;
+    s.add(id);
+    const n = H[id];
+    if (n.del && !throughDeleted) continue;
+    st.push(n.left, n.right, n.next);
+  }
+  return s;
+}
+
+function layoutTree() {
+  const P = {};
+  const seen = new Set();
+  let r = 0;
+  const walk = (id, d) => {
+    if (id == null || seen.has(id)) return;
+    seen.add(id);
+    walk(H[id].left, d + 1);
+    P[id] = { x: X0 + r * DX, y: Y0 + d * DY };
+    r++;
+    walk(H[id].right, d + 1);
+  };
+  walk(V.m_root, 0);
+  for (const id in H) {
+    if (P[id]) continue;
+    if (lastPos[id]) { P[id] = { ...lastPos[id] }; continue; }
+    const h = hints[id];
+    const pp = h && h.parent != null ? (P[h.parent] || lastPos[h.parent]) : null;
+    P[id] = pp ? { x: pp.x + (h.side === "left" ? -DX / 2 : DX / 2), y: pp.y + DY } : { x: X0, y: Y0 };
+  }
+  for (const id in P) lastPos[id] = { ...P[id] };
+  return P;
+}
+
+function layoutList() {
+  const P = {};
+  for (const id in H) P[id] = { x: LX0 + slots[id] * LDX, y: LY };
+  return P;
+}
+
+function snap(lines, msg, ex) {
+  ex = ex || {};
+  const P = kind === "list" ? layoutList() : layoutTree();
+  const r = refs();
+  const vis = {};
+  for (const id in H) if (!H[id].del || r.has(+id) || prevRef.has(+id)) vis[id] = 1;
+  prevRef = r;
+  steps.push({
+    lines: lines, msg: msg,
+    H: JSON.parse(JSON.stringify(H)), V: { ...V }, F: F.map(f => ({ ...f })),
+    P: P, vis: vis, reach: [...reach(false)], leaked: [...leaked],
+    hl: ex.hl || {}, link: ex.link || null, token: ex.token || null, chip: ex.chip || null
+  });
+}
+
+function hlOf(pairs) {
+  const o = {};
+  for (const [id, v] of pairs) if (id != null) o[id] = v;
+  return o;
+}
+
+function ret(lines, val, msg, ex) {
+  const top = F[F.length - 1];
+  top.retTxt = nm(val);
+  snap(lines, msg, ex);
+  F.pop();
+  return val;
+}
+
+function writeBack(owner, field, r, lines, txt) {
+  const isVar = owner === "V";
+  const old = isVar ? V[field] : H[owner][field];
+  const top = F[F.length - 1];
+  top.got = nm(r);
+  stats.wb++;
+  let k, msg;
+  const where = F.length > 1 ? "frame #" + (F.length - 1) : "the wrapper " + top.fn + "()";
+  const intro = "Back in " + where + " with the returned pointer " + nm(r) + ". ";
+  if (!bug) {
+    if (isVar) V[field] = r; else H[owner][field] = r;
+    if (old === r) {
+      k = "same"; stats.same++;
+      msg = intro + "Store it: " + txt + " = " + nm(r) + ". " + txt + " already held that pointer, so the same value is stored back and nothing changes.";
+    } else {
+      k = "changed"; stats.changed++;
+      if (isVar) stats.topChanged = true;
+      msg = intro + "Store it: " + txt + " = " + nm(r) + ". " + txt + " held " + nm(old) + " before, so this link really changes.";
+    }
+  } else {
+    if (old === r) {
+      k = "ignored"; stats.ignored++;
+      msg = intro + "The code ignores it. " + txt + " still holds " + nm(old) + ", which happens to be the same pointer, so no harm this time.";
+    } else {
+      k = "lost"; stats.lost++;
+      msg = intro + "The code ignores it! " + txt + " still holds " + nm(old) + ".";
+      if (old != null && H[old].del) msg += " That node was deleted: " + txt + " is now a dangling pointer.";
+      if (r != null && !H[r].del && !reach(false).has(r)) {
+        if (reach(true).has(r)) msg += " Node " + nm(r) + " can only be reached through a deleted node.";
+        else { leaked.add(r); msg += " Nothing points to " + nm(r) + ": it is lost forever, a memory leak."; }
+      }
+    }
+  }
+  snap(lines, msg, { link: { owner: owner, field: field, kind: k }, token: { r: r, owner: owner, field: field, kind: k }, chip: k });
+  top.got = undefined;
+}
+
+function finish() {
+  let msg, chip;
+  if (!bug) {
+    chip = "done";
+    const top = kind === "list" ? "m_head" : "m_root";
+    msg = "Done. " + plural(stats.wb, "returned pointer was", "returned pointers were") + " stored back into links. ";
+    if (stats.changed === 0) msg += "None of them changed anything: every caller stored back the pointer it already had. The same code handles the change and the no-change case.";
+    else if (stats.same === 0) msg += "That one store changed " + top + ", and the wrapper needed no special case for it.";
+    else msg += "Only " + stats.changed + " of them changed a link (orange); the other " + stats.same + " stored back the pointer that was already there (gray).";
+    if (stats.topChanged && stats.same > 0) msg += " The changed link was " + top + " itself, handled by the same line of code.";
+  } else {
+    msg = "Done. " + plural(stats.wb, "returned pointer was", "returned pointers were") + " ignored. ";
+    if (stats.lost === 0) {
+      chip = "lucky";
+      msg += "This time the result happens to be right, because no link needed to change. The bug is still there: try a key that changes the structure.";
+    } else {
+      chip = "broken";
+      let dang = 0;
+      for (const k of ["m_head", "m_tail", "m_root"]) if (V[k] != null && H[V[k]].del) dang++;
+      for (const id in H) {
+        const n = H[id];
+        if (n.del) continue;
+        for (const f of ["left", "right", "next"]) if (n[f] != null && H[n[f]].del) dang++;
+      }
+      const parts = [];
+      if (dang) parts.push(dang + " dangling pointer" + (dang > 1 ? "s" : "") + " to deleted memory");
+      if (leaked.size) parts.push(leaked.size + " leaked node" + (leaked.size > 1 ? "s" : ""));
+      msg += (stats.wb === 1 ? "It" : stats.lost + " of them") + " carried a change, and that change is lost. The structure is now broken: " + parts.join(" and ") + ". Note that m_size is " + V.m_size + ", which no longer matches the structure.";
+    }
+  }
+  snap([], msg, { chip: chip });
+}
+
+function plural(n, one, many) {
+  return n + " " + (n === 1 ? one : many);
+}
+
+// ---- list: remove_r
+function simList(value) {
+  F.push({ fn: "remove", p: null, head: "remove(value = " + value + ")" });
+  snap(["wsig"], "remove(" + value + ") is the public wrapper. It starts the recursion at m_head, and stores what comes back into m_head.");
+  snap(["wcall"], "Call remove_r(m_head = " + nm(V.m_head) + ", " + value + ").");
+  const r = removeR(V.m_head, value);
+  writeBack("V", "m_head", r, ["wcall"], "m_head");
+  if (V.m_head == null) {
+    const old = V.m_tail;
+    V.m_tail = null;
+    snap(["wempty", "wtail"], "m_head is nullptr: the list is empty, so m_tail = nullptr too.", { link: { owner: "V", field: "m_tail", kind: old == null ? "same" : "changed" } });
+  }
+  F.pop();
+  finish();
+}
+
+function removeR(p, value) {
+  F.push({ fn: "remove_r", p: p, head: "remove_r(p = " + nm(p) + ", value = " + value + ")" });
+  if (p == null) {
+    snap(["sig"], "New frame with p = nullptr: the empty list.");
+    return ret(["base", "retnull"], null, "p is nullptr, so " + value + " is not in the list. Return nullptr: the empty list stays empty.");
+  }
+  snap(["sig"], "New frame. Its job: remove " + value + " from the list that starts at " + nm(p) + ", and return the first node of what is left.");
+  const n = H[p];
+  if (n.key === value) {
+    const rest = n.next;
+    snap(["base", "match", "rest"], n.key + " == " + value + ": found it. Save rest = p->next = " + nm(rest) + " before p is deleted.", { hl: hlOf([[p, "del"], [rest, "new"]]) });
+    n.del = true;
+    V.m_size--;
+    snap(["del", "size"], "delete p frees node " + n.addr + ". m_size is now " + V.m_size + ". The caller's link still points at the deleted node; only the caller can fix that.", { hl: hlOf([[rest, "new"]]) });
+    return ret(["retrest"], rest, "Return rest = " + nm(rest) + ": the list without p. The caller must store this pointer in place of p.", { hl: hlOf([[rest, "new"]]) });
+  }
+  snap(["base", "match", "rec"], n.key + " != " + value + ": p stays. Remove " + value + " from the rest: call remove_r(p->next = " + nm(n.next) + ", " + value + ").");
+  const r = removeR(n.next, value);
+  writeBack(p, "next", r, ["rec"], "p->next");
+  if (n.next == null) {
+    const old = V.m_tail;
+    V.m_tail = p;
+    snap(["tail"], "p->next is nullptr, so p is the last node: m_tail = " + nm(p) + (old === p ? " (it already was)." : "."), { link: { owner: "V", field: "m_tail", kind: old === p ? "same" : "changed" } });
+  }
+  return ret(["retp"], p, "Return p = " + nm(p) + ": this list still starts at the same node.");
+}
+
+// ---- BST: insert_helper
+let dupInsert = false;
+function simInsert(key) {
+  dupInsert = false;
+  F.push({ fn: "insert", p: null, head: "insert(key = " + key + ")" });
+  snap(["wsig"], "insert(" + key + ") is the public wrapper. It starts the recursion at m_root, and stores what comes back into m_root.");
+  snap(["wcall"], "Call insert_helper(m_root = " + nm(V.m_root) + ", " + key + ").");
+  const r = insH(V.m_root, key, null, null);
+  writeBack("V", "m_root", r, ["wcall"], "m_root");
+  V.m_size++;
+  snap(["wsize"], "++m_size: m_size is now " + V.m_size + "." + (dupInsert ? " It grew even though no node was added: this version counts calls, not new nodes." : ""));
+  F.pop();
+  finish();
+}
+
+function insH(p, key, parent, side) {
+  F.push({ fn: "insert_helper", p: p, head: "insert_helper(p = " + nm(p) + ", key = " + key + ")" });
+  if (p == null) {
+    snap(["sig"], "New frame with p = nullptr: an empty subtree.");
+    const n = mk(key);
+    hints[n] = { parent: parent, side: side };
+    return ret(["base", "new"], n, "p is nullptr: create node " + nm(n) + ". It is the root of a new one-node subtree, so return it. Nothing points to it yet: the caller must store it.", { hl: hlOf([[n, "new"]]) });
+  }
+  snap(["sig"], "New frame. Its job: insert " + key + " into the subtree rooted at " + nm(p) + ", and return the root of that subtree.");
+  const n = H[p];
+  if (key < n.key) {
+    snap(["base", "lt", "recl"], key + " < " + n.key + ": insert into the left subtree. Call insert_helper(p->left = " + nm(n.left) + ", " + key + ").");
+    const r = insH(n.left, key, p, "left");
+    writeBack(p, "left", r, ["recl"], "p->left");
+  } else if (key > n.key) {
+    snap(["base", "lt", "gt", "recr"], key + " > " + n.key + ": insert into the right subtree. Call insert_helper(p->right = " + nm(n.right) + ", " + key + ").");
+    const r = insH(n.right, key, p, "right");
+    writeBack(p, "right", r, ["recr"], "p->right");
+  } else {
+    dupInsert = true;
+    snap(["base", "lt", "gt"], key + " == " + n.key + ": the key is already here, so there is nothing to insert.");
+  }
+  return ret(["retp"], p, "Return p = " + nm(p) + ": the root of this subtree did not change.");
+}
+
+// ---- BST: remove_helper
+function simRemove(key) {
+  F.push({ fn: "remove", p: null, head: "remove(key = " + key + ")" });
+  snap(["wsig"], "remove(" + key + ") is the public wrapper. It starts the recursion at m_root, and stores what comes back into m_root.");
+  snap(["wcall"], "Call remove_helper(m_root = " + nm(V.m_root) + ", " + key + ").");
+  const r = remH(V.m_root, key);
+  writeBack("V", "m_root", r, ["wcall"], "m_root");
+  F.pop();
+  finish();
+}
+
+function remH(p, key) {
+  F.push({ fn: "remove_helper", p: p, head: "remove_helper(p = " + nm(p) + ", key = " + key + ")" });
+  if (p == null) {
+    snap(["sig"], "New frame with p = nullptr: an empty subtree.");
+    return ret(["base", "retnull"], null, "p is nullptr: " + key + " is not in the tree. Return nullptr: the empty subtree stays empty.");
+  }
+  snap(["sig"], "New frame. Its job: remove " + key + " from the subtree rooted at " + nm(p) + ", and return the root of that subtree after the removal.");
+  const n = H[p];
+  let case3 = false;
+  if (key < n.key) {
+    snap(["base", "lt", "recl"], key + " < " + n.key + ": remove from the left subtree. Call remove_helper(p->left = " + nm(n.left) + ", " + key + ").");
+    const r = remH(n.left, key);
+    writeBack(p, "left", r, ["recl"], "p->left");
+  } else if (key > n.key) {
+    snap(["base", "lt", "gt", "recr"], key + " > " + n.key + ": remove from the right subtree. Call remove_helper(p->right = " + nm(n.right) + ", " + key + ").");
+    const r = remH(n.right, key);
+    writeBack(p, "right", r, ["recr"], "p->right");
+  } else if (n.left == null || n.right == null) {
+    const child = n.left != null ? n.left : n.right;
+    const leaf = child == null;
+    snap(["base", "lt", "gt", "case12", "child"], leaf
+      ? "Found " + key + ". It is a leaf: case 1. child = nullptr."
+      : "Found " + key + ". It has one child: case 2. child = " + nm(child) + ".", { hl: hlOf([[p, "del"], [child, "new"]]) });
+    n.del = true;
+    V.m_size--;
+    snap(["del", "size"], "delete p frees node " + n.addr + ". m_size is now " + V.m_size + ". The caller's link still points at the deleted node; only the caller can fix that.", { hl: hlOf([[child, "new"]]) });
+    return ret(["retchild"], child, leaf
+      ? "Return child = nullptr: this subtree is now empty. The caller must store nullptr in place of p."
+      : "Return child = " + nm(child) + ": it takes p's place as the root of this subtree. The caller must store it in place of p.", { hl: hlOf([[child, "new"]]) });
+  } else {
+    case3 = true;
+    let s = n.right;
+    while (H[s].left != null) s = H[s].left;
+    snap(["base", "lt", "gt", "case12", "case3"], "Found " + key + ". It has two children: case 3. Its successor is the smallest key in the right subtree: " + nm(s) + ".", { hl: hlOf([[s, "succ"]]) });
+    const k = H[s].key;
+    n.key = k;
+    snap(["copy"], "Copy the successor's key up: p->key = " + k + ". The node at " + n.addr + " stays where it is; only its key changes. Now " + k + " appears twice, so remove the lower copy from the right subtree.", { hl: hlOf([[p, "new"], [s, "succ"]]) });
+    snap(["rec3"], "Call remove_helper(p->right = " + nm(n.right) + ", " + k + ").", { hl: hlOf([[s, "succ"]]) });
+    const r = remH(n.right, k);
+    writeBack(p, "right", r, ["rec3"], "p->right");
+  }
+  return ret(["retp"], p, "Return p = " + nm(p) + ": this subtree still has the same root node" + (case3 ? " (only its key changed)." : "."));
+}
+
+// ---- build the starting structure
+function build(op, keys) {
+  if (op === "list") {
+    V = { m_head: null, m_tail: null, m_size: 0 };
+    let prev = null;
+    keys.forEach((k, i) => {
+      const id = mk(k);
+      slots[id] = i;
+      if (prev == null) V.m_head = id; else H[prev].next = id;
+      prev = id;
+      V.m_size++;
+    });
+    V.m_tail = prev;
+  } else {
+    V = { m_root: null, m_size: 0 };
+    for (const k of keys) {
+      if (V.m_root == null) { V.m_root = mk(k); V.m_size++; continue; }
+      let p = V.m_root;
+      for (;;) {
+        const n = H[p];
+        if (k === n.key) break;
+        const f = k < n.key ? "left" : "right";
+        if (n[f] == null) { n[f] = mk(k); V.m_size++; break; }
+        p = n[f];
+      }
+    }
+  }
+}
+
+function makeTrace(op, keys, key, withBug) {
+  resetSim(OPS[op].kind, withBug);
+  build(op, keys);
+  if (op === "list") simList(key);
+  else if (op === "insert") simInsert(key);
+  else simRemove(key);
+  return steps;
+}
+
+// ---------------------------------------------------------------- rendering
+const $ = id => document.getElementById(id);
+const svg = $("mem");
+const S = { steps: [], i: 0, disp: {}, raf: 0, timer: 0, op: "list", bug: false, kind: "list", nSlots: 0 };
+
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function fmtCode(t) {
+  const j = t.indexOf("//");
+  if (j < 0) return '<span class="code">' + esc(t) + "</span>";
+  return '<span class="code">' + esc(t.slice(0, j)) + '</span><span class="c">' + esc(t.slice(j)) + "</span>";
+}
+
+function renderCode(st) {
+  const hl = new Set(st.lines);
+  $("code").innerHTML = CODE[S.op].map((l, i) => {
+    const useBug = S.bug && l[2];
+    const txt = useBug ? l[2] : l[1];
+    let cls = "ln";
+    if (l[0] && hl.has(l[0])) cls += " hl";
+    if (useBug) cls += " bugline";
+    return '<div class="' + cls + '"><span class="no">' + (i + 1) + "</span>" + fmtCode(txt) + "</div>";
+  }).join("");
+}
+
+function renderStack(st) {
+  if (!st.F.length) {
+    $("stack").innerHTML = '<div class="empty">(empty: no calls are running)</div>';
+    return;
+  }
+  const html = st.F.map((f, i) => {
+    const top = i === st.F.length - 1;
+    let s = '<div class="frame' + (top ? " top" : "") + (i === 0 ? " wrapper" : "") + '">';
+    s += '<div class="fh">' + (i > 0 ? '<span class="badge">#' + i + "</span>" : "") + "<code>" + esc(f.head) + "</code></div>";
+    if (f.got !== undefined) s += '<div class="got">received: <code>' + esc(f.got) + "</code></div>";
+    if (f.retTxt !== undefined) s += '<div class="ret">returns: <code>' + esc(f.retTxt) + "</code></div>";
+    return s + "</div>";
+  });
+  $("stack").innerHTML = html.reverse().join("");
+}
+
+const CHIPS = {
+  same: "SAME POINTER STORED BACK", changed: "LINK CHANGED",
+  ignored: "RESULT IGNORED (no harm here)", lost: "RESULT IGNORED: CHANGE LOST",
+  done: "DONE", lucky: "DONE (lucky)", broken: "DONE: STRUCTURE BROKEN"
+};
+
+function renderCaption(st) {
+  $("stepno").textContent = "Step " + (S.i + 1) + " of " + S.steps.length;
+  $("chip").innerHTML = st.chip ? '<span class="chip ' + st.chip + '">' + CHIPS[st.chip] + "</span>" : "";
+  $("msg").textContent = st.msg;
+}
+
+function varPos(name) {
+  if (S.kind === "tree") return { x: 70, y: 40 };
+  if (name === "m_head") return { x: LX0, y: 60 };
+  return { x: LX0 + Math.max(S.nSlots - 1, 1) * LDX, y: 60 };
+}
+
+function slotPos(P, owner, field) {
+  if (owner === "V") { const v = varPos(field); return { x: v.x, y: v.y + 17 }; }
+  const p = P[owner];
+  if (!p) return null;
+  if (S.kind === "list") return { x: p.x + LW / 2 - 20, y: p.y };
+  return { x: p.x + (field === "left" ? -16 : 16), y: p.y + NH / 2 - 7 };
+}
+
+function tokenDest(P, owner, field) {
+  if (owner === "V") { const v = varPos(field); return { x: v.x + 100, y: v.y }; }
+  const sp = slotPos(P, owner, field);
+  if (!sp) return { x: 0, y: 0 };
+  if (S.kind === "list") return { x: sp.x, y: sp.y - LH / 2 - 20 };
+  return { x: sp.x + (field === "left" ? -22 : 22), y: sp.y + 30 };
+}
+
+function edgeKind(k) {
+  return k === "ignored" ? "same" : k;
+}
+
+function path(a, b, cls, arc) {
+  let d;
+  if (arc) {
+    const mx = (a.x + b.x) / 2;
+    d = "M" + a.x + "," + a.y + " Q" + mx + "," + (a.y - 120) + " " + b.x + "," + (b.y - LH / 2);
+  } else {
+    d = "M" + a.x + "," + a.y + " L" + b.x + "," + b.y;
+  }
+  return '<path class="e e-' + cls + '" d="' + d + '" marker-end="url(#ah-' + cls + ')"/>';
+}
+
+function linkClass(st, owner, field, target) {
+  const lk = st.link;
+  if (lk && String(lk.owner) === String(owner) && lk.field === field) return edgeKind(lk.kind);
+  if (owner !== "V" && st.H[owner].del) return "ghost";
+  if (target != null && st.H[target].del) return "dangle";
+  return "normal";
+}
+
+function markers() {
+  let s = "<defs>";
+  for (const c of ["normal", "same", "changed", "lost", "dangle", "ghost"]) {
+    s += '<marker id="ah-' + c + '" class="ah-' + c + '" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M0,0 L10,5 L0,10 z"/></marker>';
+  }
+  return s + "</defs>";
+}
+
+function nodeClass(st, id, reachSet, cur) {
+  const n = st.H[id];
+  let c = "node";
+  let tag = "";
+  if (n.del) { c += " ghost"; tag = "deleted"; }
+  else if (!reachSet.has(+id)) {
+    if (st.leaked.includes(+id)) { c += " leak"; tag = "leaked"; }
+    else { c += " float"; tag = "not linked yet"; }
+  }
+  if (cur != null && String(cur) === String(id)) c += " cur";
+  if (st.hl[id]) c += " h-" + st.hl[id];
+  return { c: c, tag: tag };
+}
+
+function drawVar(s, st, P, name) {
+  const v = varPos(name);
+  const t = st.V[name];
+  const lk = st.link;
+  const hlv = lk && lk.owner === "V" && lk.field === name;
+  s.push('<g class="var' + (hlv ? " hlv" : "") + '"><rect x="' + (v.x - 45) + '" y="' + (v.y - 17) + '" width="90" height="34" rx="6"/><text x="' + v.x + '" y="' + (v.y + 5) + '" text-anchor="middle">' + name + "</text></g>");
+  if (t == null) {
+    s.push('<text class="nul" x="' + v.x + '" y="' + (v.y + 34) + '" text-anchor="middle">nullptr</text>');
+    return;
+  }
+  const tp = P[t];
+  if (!tp) return;
+  const from = { x: v.x, y: v.y + 17 };
+  const to = S.kind === "list" ? { x: tp.x - 20, y: tp.y - LH / 2 } : { x: tp.x, y: tp.y - NH / 2 };
+  s.push(path(from, to, linkClass(st, "V", name, t), false));
+}
+
+function drawTree(s, st, P, reachSet, cur) {
+  const ids = Object.keys(st.H).filter(id => st.vis[id] && P[id]);
+  // edges
+  for (const id of ids) {
+    const n = st.H[id];
+    for (const f of ["left", "right"]) {
+      const sp = slotPos(P, id, f);
+      const c = n[f];
+      if (c == null || !st.vis[c] || !P[c]) continue;
+      s.push(path(sp, { x: P[c].x, y: P[c].y - NH / 2 }, linkClass(st, id, f, c), false));
+    }
+  }
+  drawVar(s, st, P, "m_root");
+  s.push('<text class="size" x="70" y="' + 80 + '" text-anchor="middle">m_size = ' + st.V.m_size + "</text>");
+  // nodes, ghosts first
+  ids.sort((a, b) => (st.H[b].del ? 1 : 0) - (st.H[a].del ? 1 : 0));
+  for (const id of ids) {
+    const n = st.H[id];
+    const p = P[id];
+    const k = nodeClass(st, id, reachSet, cur);
+    let g = '<g class="' + k.c + '">';
+    g += '<text class="addr" x="' + p.x + '" y="' + (p.y - NH / 2 - 5) + '" text-anchor="middle">' + n.addr + "</text>";
+    g += '<rect x="' + (p.x - NW / 2) + '" y="' + (p.y - NH / 2) + '" width="' + NW + '" height="' + NH + '" rx="7"/>';
+    g += '<text class="key" x="' + p.x + '" y="' + (p.y + 1) + '" text-anchor="middle">' + n.key + "</text>";
+    for (const f of ["left", "right"]) {
+      const sp = slotPos(P, id, f);
+      g += n[f] == null ? '<circle class="nslot" cx="' + sp.x + '" cy="' + sp.y + '" r="3.5"/>' : '<circle class="slot" cx="' + sp.x + '" cy="' + sp.y + '" r="3.5"/>';
+    }
+    if (n.del) g += '<line class="x" x1="' + (p.x - 14) + '" y1="' + (p.y - 12) + '" x2="' + (p.x + 14) + '" y2="' + (p.y + 12) + '"/><line class="x" x1="' + (p.x + 14) + '" y1="' + (p.y - 12) + '" x2="' + (p.x - 14) + '" y2="' + (p.y + 12) + '"/>';
+    if (k.tag) g += '<text class="tag" x="' + p.x + '" y="' + (p.y + NH / 2 + 15) + '" text-anchor="middle">' + k.tag + "</text>";
+    s.push(g + "</g>");
+  }
+  drawBadges(s, st, P, NW, NH);
+}
+
+function drawList(s, st, P, reachSet, cur) {
+  const ids = Object.keys(st.H).filter(id => st.vis[id] && P[id]);
+  for (const id of ids) {
+    const n = st.H[id];
+    const c = n.next;
+    if (c == null || !st.vis[c] || !P[c]) continue;
+    const a = slotPos(P, id, "next");
+    const b = { x: P[c].x - LW / 2, y: P[c].y };
+    const lo = Math.min(P[id].x, P[c].x), hi = Math.max(P[id].x, P[c].x);
+    const arc = ids.some(o => o !== id && String(o) !== String(c) && P[o].x > lo && P[o].x < hi);
+    const target = arc ? { x: P[c].x - LW / 2 + 16, y: P[c].y } : b;
+    s.push(path(a, target, linkClass(st, id, "next", c), arc));
+  }
+  drawVar(s, st, P, "m_head");
+  drawVar(s, st, P, "m_tail");
+  s.push('<text class="size" x="' + LX0 + '" y="' + (LY + 70) + '" text-anchor="middle">m_size = ' + st.V.m_size + "</text>");
+  for (const id of ids) {
+    const n = st.H[id];
+    const p = P[id];
+    const k = nodeClass(st, id, reachSet, cur);
+    const x0 = p.x - LW / 2, y0 = p.y - LH / 2, dx = x0 + LW - 40;
+    let g = '<g class="' + k.c + '">';
+    g += '<text class="addr" x="' + p.x + '" y="' + (y0 - 5) + '" text-anchor="middle">' + n.addr + "</text>";
+    g += '<rect x="' + x0 + '" y="' + y0 + '" width="' + LW + '" height="' + LH + '" rx="7"/>';
+    g += '<line class="div" x1="' + dx + '" y1="' + y0 + '" x2="' + dx + '" y2="' + (y0 + LH) + '"/>';
+    g += '<text class="key" x="' + (x0 + (LW - 40) / 2) + '" y="' + (p.y + 6) + '" text-anchor="middle">' + n.key + "</text>";
+    const sp = slotPos(P, id, "next");
+    if (n.next == null) g += '<line class="nslash" x1="' + (dx + 8) + '" y1="' + (y0 + LH - 8) + '" x2="' + (dx + 32) + '" y2="' + (y0 + 8) + '"/>';
+    else g += '<circle class="slot" cx="' + sp.x + '" cy="' + sp.y + '" r="4"/>';
+    if (n.del) g += '<line class="x" x1="' + (x0 + 14) + '" y1="' + (y0 + 8) + '" x2="' + (x0 + 54) + '" y2="' + (y0 + LH - 8) + '"/><line class="x" x1="' + (x0 + 54) + '" y1="' + (y0 + 8) + '" x2="' + (x0 + 14) + '" y2="' + (y0 + LH - 8) + '"/>';
+    if (k.tag) g += '<text class="tag" x="' + p.x + '" y="' + (y0 + LH + 16) + '" text-anchor="middle">' + k.tag + "</text>";
+    s.push(g + "</g>");
+  }
+  drawBadges(s, st, P, LW, LH);
+}
+
+function drawBadges(s, st, P, w, h) {
+  st.F.forEach((f, i) => {
+    if (i === 0 || f.p == null || !P[f.p] || !st.vis[f.p]) return;
+    const p = P[f.p];
+    const top = i === st.F.length - 1;
+    const x = p.x - w / 2 - 2, y = p.y - h / 2 - 2;
+    s.push('<g class="fbadge' + (top ? " top" : "") + '"><circle cx="' + x + '" cy="' + y + '" r="11"/><text x="' + x + '" y="' + (y + 4) + '" text-anchor="middle">#' + i + "</text></g>");
+  });
+}
+
+function drawToken(s, st, P, from, t) {
+  const tk = st.token;
+  const dest = tokenDest(P, tk.owner, tk.field);
+  let src;
+  if (tk.r != null && (from[tk.r] || P[tk.r])) src = from[tk.r] || P[tk.r];
+  else src = { x: dest.x, y: dest.y + 60 };
+  const e = ease(t);
+  const x = src.x + (dest.x - src.x) * e;
+  const y = src.y + (dest.y - src.y) * e - Math.sin(Math.PI * e) * 50;
+  const txt = tk.r == null ? "nullptr" : st.H[tk.r].addr;
+  const w = txt.length * 8.5 + 18;
+  let g = '<g class="token tk-' + tk.kind + '" transform="translate(' + x + "," + y + ')">';
+  g += '<rect x="' + (-w / 2) + '" y="-12" width="' + w + '" height="24" rx="12"/>';
+  g += '<text y="5" text-anchor="middle">' + txt + "</text>";
+  if (tk.kind === "lost" && t >= 1) g += '<line class="strike" x1="' + (-w / 2 + 6) + '" y1="0" x2="' + (w / 2 - 6) + '" y2="0"/>';
+  g += "</g>";
+  if (t >= 1 && (tk.kind === "lost" || tk.kind === "ignored")) {
+    g += '<text class="tk-note ' + tk.kind + '" x="' + x + '" y="' + (y + 28) + '" text-anchor="middle">ignored</text>';
+  }
+  s.push(g);
+}
+
+function ease(t) {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+function drawDiagram(st, P, from, t) {
+  const s = [markers()];
+  const reachSet = new Set(st.reach);
+  const topF = st.F[st.F.length - 1];
+  const cur = topF && st.F.length > 1 ? topF.p : null;
+  if (S.kind === "list") drawList(s, st, P, reachSet, cur);
+  else drawTree(s, st, P, reachSet, cur);
+  if (st.token) drawToken(s, st, P, from, t);
+  svg.innerHTML = s.join("");
+}
+
+function computeViewBox() {
+  let x0 = Infinity, y0 = 0, x1 = -Infinity, y1 = -Infinity;
+  const w = S.kind === "list" ? LW : NW;
+  for (const st of S.steps) {
+    for (const id in st.P) {
+      if (!st.vis[id]) continue;
+      const p = st.P[id];
+      x0 = Math.min(x0, p.x - w / 2 - 30);
+      x1 = Math.max(x1, p.x + w / 2 + 40);
+      y1 = Math.max(y1, p.y + 70);
+    }
+  }
+  x0 = Math.min(x0, 10);
+  x1 = Math.max(x1, S.kind === "list" ? varPos("m_tail").x + 160 : 400);
+  y1 = Math.max(y1, S.kind === "list" ? LY + 90 : 260);
+  svg.setAttribute("viewBox", x0 + " " + y0 + " " + (x1 - x0) + " " + (y1 - y0));
+}
+
+// ---------------------------------------------------------------- player
+const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function animDuration() {
+  if (reduceMotion) return 1;
+  return Math.min(650, +$("speed").value * 0.45);
+}
+
+function go(i) {
+  if (!S.steps.length) return;
+  i = Math.max(0, Math.min(S.steps.length - 1, i));
+  const from = { ...S.disp };
+  S.i = i;
+  const st = S.steps[i];
+  renderCode(st);
+  renderStack(st);
+  renderCaption(st);
+  cancelAnimationFrame(S.raf);
+  const t0 = performance.now();
+  const D = animDuration();
+  const tick = now => {
+    const t = Math.min(1, (now - t0) / D);
+    const e = ease(t);
+    const P = {};
+    for (const id in st.P) {
+      const a = from[id] || st.P[id];
+      const b = st.P[id];
+      P[id] = { x: a.x + (b.x - a.x) * e, y: a.y + (b.y - a.y) * e };
+    }
+    S.disp = P;
+    drawDiagram(st, P, from, t);
+    if (t < 1) S.raf = requestAnimationFrame(tick);
+  };
+  S.raf = requestAnimationFrame(tick);
+  if (S.i === S.steps.length - 1) stop();
+}
+
+function play() {
+  if (S.timer) { stop(); return; }
+  if (S.i >= S.steps.length - 1) go(0);
+  $("play").textContent = "Pause";
+  S.timer = setInterval(() => {
+    if (S.i >= S.steps.length - 1) { stop(); return; }
+    go(S.i + 1);
+  }, +$("speed").value);
+}
+
+function stop() {
+  clearInterval(S.timer);
+  S.timer = 0;
+  $("play").textContent = "Play";
+}
+
+function parseKeys(s) {
+  const t = s.trim();
+  if (t === "") return [];
+  return t.split(/[\s,]+/).map(Number);
+}
+
+function run() {
+  stop();
+  const op = $("op").value;
+  const keys = parseKeys($("struct").value);
+  const key = Number($("key").value.trim());
+  const bad = keys.some(k => !Number.isInteger(k) || Math.abs(k) > 999) || $("key").value.trim() === "" || !Number.isInteger(key) || Math.abs(key) > 999;
+  const max = op === "list" ? 8 : 15;
+  if (bad || keys.length > max || (op === "list" && keys.length === 0)) {
+    $("msg").innerHTML = '<span class="err">Use whole numbers between -999 and 999, separated by spaces, with at most ' + max + " keys" + (op === "list" ? " and at least one" : "") + ".</span>";
+    return;
+  }
+  S.op = op;
+  S.bug = $("bug").checked;
+  S.kind = OPS[op].kind;
+  S.steps = makeTrace(op, keys, key, S.bug);
+  S.nSlots = op === "list" ? keys.length : 0;
+  S.disp = {};
+  computeViewBox();
+  go(0);
+}
+
+function setOp(op, keepInputs) {
+  const o = OPS[op];
+  $("structLbl").textContent = o.structLabel;
+  $("keyLbl").textContent = o.keyLabel;
+  if (!keepInputs) {
+    $("struct").value = o.presets[1][1];
+    $("key").value = String(o.presets[1][2]);
+  }
+  const pr = $("presets");
+  pr.innerHTML = '<span class="lbl">Try:</span>';
+  for (const [label, struct, key] of o.presets) {
+    const b = document.createElement("button");
+    b.textContent = label;
+    b.addEventListener("click", () => {
+      $("struct").value = struct;
+      $("key").value = String(key);
+      run();
+    });
+    pr.appendChild(b);
+  }
+}
+
+$("op").addEventListener("change", () => { setOp($("op").value, false); run(); });
+$("run").addEventListener("click", run);
+$("bug").addEventListener("change", run);
+$("first").addEventListener("click", () => { stop(); go(0); });
+$("prev").addEventListener("click", () => { stop(); go(S.i - 1); });
+$("next").addEventListener("click", () => { stop(); go(S.i + 1); });
+$("last").addEventListener("click", () => { stop(); go(S.steps.length - 1); });
+$("play").addEventListener("click", play);
+$("struct").addEventListener("keydown", e => { if (e.key === "Enter") run(); });
+$("key").addEventListener("keydown", e => { if (e.key === "Enter") run(); });
+document.addEventListener("keydown", e => {
+  const tag = (e.target.tagName || "").toLowerCase();
+  if (tag === "input" || tag === "select" || tag === "textarea") return;
+  if (e.key === "ArrowRight") { stop(); go(S.i + 1); e.preventDefault(); }
+  else if (e.key === "ArrowLeft") { stop(); go(S.i - 1); e.preventDefault(); }
+  else if (e.key === "Home") { stop(); go(0); e.preventDefault(); }
+  else if (e.key === "End") { stop(); go(S.steps.length - 1); e.preventDefault(); }
+  else if (e.key === " ") { play(); e.preventDefault(); }
+});
+
+setOp("list", false);
+run();
+</script>
+</body>
+</html>
