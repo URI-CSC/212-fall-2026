@@ -1,9 +1,9 @@
-# Lab 09: Ordered sets and maps, and the attacker who picks your input
+# Lab 09: Ordered sets and maps
 
 Every month, software vendors ship fixes for hundreds of security bugs, and
 some of those bugs are used by attackers before the fix is out. Many of them
-have the same cause: the code trusted its input. Today you build a set of
-strings as a **binary search tree**, and then you attack it, with nothing but
+have the same cause: the code trusted its input. Today you build a *set* of
+strings backed by a **binary search tree**, and then you attack it, with nothing but
 the **order** of its input. At the end you use `std::set` and `std::map` to
 catch an attacker who is guessing passwords.
 
@@ -38,7 +38,7 @@ see `ALL TESTS PASSED`.
 
 ### Idea
 
-A **set** holds each key at most once. Its main question is: is this key in
+A **set** is a collection that holds each key at most once. Its main question is: is this key in
 the set? A website asks it every time a user picks a new password: is it on
 the list of passwords that attackers try first?
 
@@ -67,7 +67,7 @@ larger, go right; if it is equal, you found it. If you fall off the tree
 node where the walk falls off. If the key is already there, insert does
 nothing.
 
-Each operation has a public method that calls a private recursive **helper**
+Each operation has a public **wrapper** that calls a private recursive **helper**
 on the root. The helper works on the subtree rooted at `p`.
 
 ### Declare
