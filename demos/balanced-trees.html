@@ -1,0 +1,950 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2-3 Trees and Red-Black Trees</title>
+<style>
+:root {
+  --bg: #f7f6f2;
+  --panel: #ffffff;
+  --ink: #1d1d1f;
+  --muted: #6b6b70;
+  --line: #dcd9d1;
+  --code-bg: #f3f1eb;
+  --hl: #ffeeb0;
+  --edge: #55585f;
+  --cur: #2563eb;
+  --path: #e8740c;
+  --red: #d62728;
+  --black: #222326;
+  --black-ring: #222326;
+  --node23: #e9f1f9;
+  --node23-edge: #1f77b4;
+  --temp: #fde9d6;
+  --new: #1a8f4a;
+  --btn: #ecebe6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17181b;
+    --panel: #212327;
+    --ink: #ececec;
+    --muted: #a0a3aa;
+    --line: #3a3d44;
+    --code-bg: #1b1d21;
+    --hl: #4a3f12;
+    --edge: #b9bcc4;
+    --cur: #6ea0ff;
+    --path: #ff9640;
+    --red: #ff5c66;
+    --black: #0b0b0c;
+    --black-ring: #9aa0aa;
+    --node23: #1d2a38;
+    --node23-edge: #6ea0ff;
+    --temp: #3d2a17;
+    --new: #43c776;
+    --btn: #30333a;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17181b;
+  --panel: #212327;
+  --ink: #ececec;
+  --muted: #a0a3aa;
+  --line: #3a3d44;
+  --code-bg: #1b1d21;
+  --hl: #4a3f12;
+  --edge: #b9bcc4;
+  --cur: #6ea0ff;
+  --path: #ff9640;
+  --red: #ff5c66;
+  --black: #0b0b0c;
+  --black-ring: #9aa0aa;
+  --node23: #1d2a38;
+  --node23-edge: #6ea0ff;
+  --temp: #3d2a17;
+  --new: #43c776;
+  --btn: #30333a;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+code, pre, .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+header { padding: 14px 16px 4px; max-width: 1500px; margin: 0 auto; }
+h1 { font-size: 1.35rem; margin: 0 0 4px; }
+.idea { margin: 0; color: var(--muted); }
+.idea b { color: var(--ink); }
+.help { margin-top: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; font-size: 0.92rem; }
+.help summary { cursor: pointer; font-weight: 600; }
+.help ol { margin: 8px 0 4px; padding-left: 1.4em; }
+.help li { margin: 3px 0; }
+.help ul { margin: 3px 0; padding-left: 1.2em; }
+.help p { margin: 6px 0 4px; color: var(--muted); }
+.controls { max-width: 1500px; margin: 0 auto; padding: 8px 16px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-bottom: 8px; }
+label { display: inline-flex; gap: 6px; align-items: center; font-size: 0.95rem; }
+input[type=text] {
+  font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--panel); color: var(--ink);
+}
+#key { width: 5em; }
+#seq { width: 22em; max-width: 100%; }
+button {
+  font: inherit; font-size: 0.92rem; padding: 5px 11px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--btn); color: var(--ink); cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+button:disabled { opacity: 0.45; cursor: default; }
+button.primary { background: var(--cur); color: #fff; border-color: var(--cur); }
+.presets button { font-size: 0.85rem; }
+.presets .lbl { color: var(--muted); font-size: 0.85rem; }
+.sep { width: 1px; align-self: stretch; background: var(--line); }
+main {
+  max-width: 1500px; margin: 0 auto; padding: 0 16px 24px;
+  display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 8fr); gap: 14px;
+}
+.col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+.panel h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 6px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.panel h2 .sub { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.panel h2 label { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--ink); font-size: 0.85rem; margin-left: auto; }
+#code { margin: 0; background: var(--code-bg); border-radius: 6px; padding: 6px 0; overflow-x: auto; font-size: 0.84rem; }
+.ln { padding: 0 10px 0 0; white-space: pre; border-left: 4px solid transparent; }
+.ln .no { display: inline-block; width: 2.4em; text-align: right; padding-right: 0.8em; color: var(--muted); user-select: none; }
+.ln.hl { background: var(--hl); border-left-color: var(--path); }
+.ln .c { color: var(--muted); }
+.player { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.player .speed { margin-left: auto; color: var(--muted); font-size: 0.85rem; }
+.caption { font-size: 1.02rem; min-height: 9em; }
+.caption p { margin: 4px 0; }
+.caption .two { color: var(--muted); }
+.caption .two b { color: var(--ink); }
+.stepno { color: var(--muted); font-size: 0.85rem; margin-bottom: 4px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.chip { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; color: #fff; background: var(--muted); }
+.chip.fix { background: var(--path); }
+.chip.flip { background: var(--red); }
+.chip.done { background: var(--new); }
+.hint { color: var(--muted); font-size: 0.8rem; }
+.err { color: var(--red); font-weight: 600; min-height: 1.2em; font-size: 0.9rem; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5em, 1fr)); gap: 6px 12px; font-size: 0.9rem; }
+.stats div { display: flex; flex-direction: column; }
+.stats .v { font-size: 1.25rem; font-weight: 700; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+.stats .k { color: var(--muted); font-size: 0.78rem; }
+.stats .bad .v { color: var(--red); }
+svg.tree { width: 100%; height: auto; display: block; }
+#rbsvg { max-height: 46vh; }
+#t23svg { max-height: 32vh; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.dot { display: inline-block; width: 13px; height: 13px; border-radius: 50%; }
+.sw { display: inline-block; width: 22px; height: 0; border-top: 4px solid; }
+.sw.thin { border-top-width: 2px; }
+.box { display: inline-block; width: 18px; height: 12px; border-radius: 3px; border: 2px solid; }
+.empty { color: var(--muted); font-style: italic; font-size: 0.9rem; }
+
+/* SVG */
+svg text { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+.nk { font-size: 15px; font-weight: 700; fill: #fff; }
+.k23 { font-size: 15px; font-weight: 700; fill: var(--ink); }
+.k23.new { fill: var(--path); }
+.e-black { stroke: var(--edge); stroke-width: 2; fill: none; }
+.e-red { stroke: var(--red); stroke-width: 6; fill: none; stroke-linecap: round; }
+.n-red { fill: var(--red); }
+.n-black { fill: var(--black); stroke: var(--black-ring); stroke-width: 1.5; }
+.ring-path { fill: none; stroke: var(--path); stroke-width: 3; }
+.ring-cur { fill: none; stroke: var(--cur); stroke-width: 4; }
+.ring-new { fill: none; stroke: var(--new); stroke-width: 3; stroke-dasharray: 4 3; }
+.grp { fill: var(--node23); stroke: var(--node23-edge); stroke-width: 1.5; opacity: 0.9; }
+.n23 { fill: var(--node23); stroke: var(--node23-edge); stroke-width: 2; }
+.n23.cur { stroke: var(--cur); stroke-width: 3.5; }
+.n23.act { stroke: var(--path); stroke-width: 3.5; }
+.n23.temp { fill: var(--temp); stroke: var(--path); stroke-width: 3; stroke-dasharray: 7 4; }
+.div23 { stroke: var(--node23-edge); stroke-width: 1.2; }
+.e23 { stroke: var(--edge); stroke-width: 1.8; fill: none; }
+.e23.path { stroke: var(--path); stroke-width: 3.5; }
+.lbl { font-size: 12px; fill: var(--muted); }
+
+@media (max-width: 900px) {
+  main { grid-template-columns: minmax(0, 1fr); }
+  .player .speed { margin-left: 0; }
+  #rbsvg, #t23svg { max-height: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>2-3 trees and left-leaning red-black trees</h1>
+  <p class="idea">A red-black tree is a <b>2-3 tree written as a BST</b>: a red link glues two BST nodes into one 3-node.
+  Insert is the plain BST insert, plus three <b>local fixes</b> on the way back up: <code>rotate_left</code>, <code>rotate_right</code>, <code>flip_colors</code>.
+  Watch each fix in the red-black tree (top) and what it means in the 2-3 tree (bottom).</p>
+  <details class="help">
+    <summary>How to use this demo</summary>
+    <ol>
+      <li>Type a key and click <b>Insert</b>, or click a preset under <b>Try</b>. The demo then shows the insert one step at a time.</li>
+      <li>Step with <b>Next</b> and <b>Prev</b>, or with the Left and Right arrow keys. <b>Play</b> runs the steps on its own; the slider sets the speed. <b>Last</b> jumps to the end of the insert.</li>
+      <li>Watch four things together:
+        <ul>
+          <li><b>Code</b>: the highlighted line is the one running now</li>
+          <li><b>Red-black tree</b>: the blue ring is the node <code>p</code> of the running call; orange rings mark the path from the root</li>
+          <li><b>2-3 tree</b>: the same tree with every red link glued; an orange dashed box is a temporary 4-node, which must split</li>
+          <li><b>What happened</b>: the step, in red-black terms and in 2-3 terms</li>
+        </ul>
+      </li>
+      <li>Turn on <b>Draw red links flat</b>. The red-black tree moves into the shape of its 2-3 tree.</li>
+      <li><b>Insert all</b> inserts every key in the sequence box, without steps. <b>Undo</b> removes the last insert. <b>Clear</b> starts over.</li>
+      <li>Compare the heights: the stats show the height a <b>plain BST</b> would have with the same insertion order.</li>
+    </ol>
+    <p><b>Tip:</b> before you click <b>Next</b> on the way back up, predict which of the three fixes will run at <code>p</code>, if any. Then check.</p>
+  </details>
+</header>
+
+<section class="controls">
+  <div class="row">
+    <label>Key <input type="text" id="key" inputmode="numeric" placeholder="e.g. 42"></label>
+    <button id="insert" class="primary">Insert</button>
+    <span class="sep"></span>
+    <label>Sequence <input type="text" id="seq" placeholder="10 20 30 40 50 60 70"></label>
+    <button id="insertAll">Insert all</button>
+    <span class="sep"></span>
+    <button id="undo">Undo</button>
+    <button id="clear">Clear</button>
+  </div>
+  <div class="row presets" id="presets"><span class="lbl">Try:</span></div>
+  <div class="err" id="err"></div>
+</section>
+
+<main>
+  <div class="col">
+    <div class="panel">
+      <h2>Code</h2>
+      <pre id="code"></pre>
+    </div>
+    <div class="panel">
+      <div class="player">
+        <button id="first" title="Start of this insert (Home)">|&lt; First</button>
+        <button id="prev" title="Previous step (Left arrow)">&lt; Prev</button>
+        <button id="play" title="Play / pause (Space)">Play</button>
+        <button id="next" title="Next step (Right arrow)">Next &gt;</button>
+        <button id="last" title="End of this insert (End)">Last &gt;|</button>
+        <label class="speed">Speed <input type="range" id="speed" min="300" max="2500" step="100" value="1200"></label>
+      </div>
+      <div class="row" style="margin: 8px 0 0">
+        <label><input type="checkbox" id="skip" checked> Skip nodes where nothing is fixed</label>
+      </div>
+    </div>
+    <div class="panel caption">
+      <div class="stepno"><span id="stepno"></span><span id="chip"></span></div>
+      <div id="msg"></div>
+      <div class="hint">Keys: Left / Right to step, Space to play, Home / End.</div>
+    </div>
+    <div class="panel">
+      <h2>Stats</h2>
+      <div class="stats" id="stats"></div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="panel">
+      <h2>Red-black tree (LLRB) <span class="sub">each node stores the color of the link from its parent</span>
+        <label><input type="checkbox" id="flat"> Draw red links flat</label></h2>
+      <svg id="rbsvg" class="tree" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Red-black tree"></svg>
+      <div class="legend">
+        <span><i class="dot" style="background: var(--red)"></i>red node: glued to its parent</span>
+        <span><i class="dot" style="background: var(--black); border: 1px solid var(--black-ring)"></i>black node</span>
+        <span><i class="sw" style="border-color: var(--red)"></i>red link</span>
+        <span><i class="dot" style="border: 3px solid var(--cur)"></i>p, the running call</span>
+        <span><i class="dot" style="border: 3px solid var(--path)"></i>on the path</span>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>The same tree as a 2-3 tree <span class="sub">glue every red link</span></h2>
+      <svg id="t23svg" class="tree" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="2-3 tree"></svg>
+      <div class="legend">
+        <span><i class="box" style="border-color: var(--node23-edge); background: var(--node23)"></i>2-node or 3-node</span>
+        <span><i class="box" style="border-color: var(--path); border-style: dashed; background: var(--temp)"></i>temporary 4-node</span>
+        <span><i class="box" style="border-color: var(--cur)"></i>holds p</span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+"use strict";
+
+// ------------------------------------------------------------------ code
+const CODE = [
+  "void LLRB::insert(int key) {",
+  "    m_root = insert_helper(m_root, key);",
+  "    m_root->red = false; // the root has no parent link",
+  "}",
+  "",
+  "Node* LLRB::insert_helper(Node* p, int key) {",
+  "    if (p == nullptr) {",
+  "        ++m_size;",
+  "        return new Node(key); // new keys arrive red",
+  "    }",
+  "    if (key < p->key)",
+  "        p->left = insert_helper(p->left, key);",
+  "    else if (key > p->key)",
+  "        p->right = insert_helper(p->right, key);",
+  "",
+  "    if (is_red(p->right) && !is_red(p->left))",
+  "        p = rotate_left(p); // a red link leans right",
+  "    if (is_red(p->left) && is_red(p->left->left))",
+  "        p = rotate_right(p); // two red links in a row",
+  "    if (is_red(p->left) && is_red(p->right))",
+  "        flip_colors(p); // a 4-node: split it",
+  "    return p;",
+  "}"
+];
+const L = { call: 1, black: 2, attach: 8, left: 11, right: 13, rotL: 16, rotR: 18, flip: 20, ret: 21, dup: 12 };
+
+function renderCode(active) {
+  const pre = document.getElementById("code");
+  pre.innerHTML = "";
+  CODE.forEach((t, i) => {
+    const d = document.createElement("div");
+    d.className = "ln" + (i === active ? " hl" : "");
+    const no = document.createElement("span");
+    no.className = "no";
+    no.textContent = i + 1;
+    d.appendChild(no);
+    const j = t.indexOf("//");
+    const code = document.createElement("span");
+    code.textContent = j >= 0 ? t.slice(0, j) : t;
+    d.appendChild(code);
+    if (j >= 0) {
+      const c = document.createElement("span");
+      c.className = "c";
+      c.textContent = t.slice(j);
+      d.appendChild(c);
+    }
+    pre.appendChild(d);
+  });
+}
+
+// ------------------------------------------------------------------ the LLRB
+class Node {
+  constructor(key) { this.key = key; this.left = null; this.right = null; this.red = true; }
+}
+const isRed = p => p !== null && p.red;
+function clone(p) {
+  if (p === null) return null;
+  const n = new Node(p.key);
+  n.red = p.red;
+  n.left = clone(p.left);
+  n.right = clone(p.right);
+  return n;
+}
+function rotateLeft(p) {
+  const x = p.right;
+  p.right = x.left;
+  x.left = p;
+  x.red = p.red;
+  p.red = true;
+  return x;
+}
+function rotateRight(p) {
+  const x = p.left;
+  p.left = x.right;
+  x.right = p;
+  x.red = p.red;
+  p.red = true;
+  return x;
+}
+function flipColors(p) {
+  p.red = true;
+  p.left.red = false;
+  p.right.red = false;
+}
+function insertPlain(root, key) { // the same insert, without a trace
+  function ins(p) {
+    if (p === null) return new Node(key);
+    if (key < p.key) p.left = ins(p.left);
+    else if (key > p.key) p.right = ins(p.right);
+    if (isRed(p.right) && !isRed(p.left)) p = rotateLeft(p);
+    if (isRed(p.left) && isRed(p.left.left)) p = rotateRight(p);
+    if (isRed(p.left) && isRed(p.right)) flipColors(p);
+    return p;
+  }
+  const r = ins(root);
+  r.red = false;
+  return r;
+}
+function height(p) { return p === null ? -1 : 1 + Math.max(height(p.left), height(p.right)); }
+function blackCount(p) { // black nodes on the leftmost root-to-null path
+  let b = 0;
+  for (; p !== null; p = p.left) if (!p.red) b++;
+  return b;
+}
+function size(p) { return p === null ? 0 : 1 + size(p.left) + size(p.right); }
+function find(p, key) {
+  while (p !== null && p.key !== key) p = key < p.key ? p.left : p.right;
+  return p;
+}
+
+// ------------------------------------------------------------------ the 2-3 view
+// a 2-3 node: { keys: [...], kids: [...] } ; built by gluing red links
+function collapse(p) {
+  if (p === null) return null;
+  const keys = [], kids = [];
+  (function group(q) {
+    if (isRed(q.left)) group(q.left); else kids.push(q.left);
+    keys.push(q.key);
+    if (isRed(q.right)) group(q.right); else kids.push(q.right);
+  })(p);
+  const leaf = kids.every(c => c === null);
+  return { keys, kids: leaf ? [] : kids.map(collapse) };
+}
+function height23(t) { let h = 0; while (t && t.kids.length) { t = t.kids[0]; h++; } return h; }
+
+// ------------------------------------------------------------------ the trace
+// every step: a full copy of the tree, the code line, and what to say
+function words23(t, key) { // the 2-3 node holding key, as "[a b]"
+  let found = null;
+  (function walk(n) {
+    if (!n || found) return;
+    if (n.keys.includes(key)) { found = n; return; }
+    n.kids.forEach(walk);
+  })(t);
+  return found;
+}
+const fmt = n => "[" + n.keys.join(" ") + "]";
+
+function traceInsert(root0, key) {
+  const steps = [];
+  const top = { root: clone(root0) };
+  const snap = s => { s.tree = clone(top.root); steps.push(s); };
+  snap({ line: L.call, kind: "start", cur: null, path: [], key,
+         rb: `Insert <b>${key}</b>: start at the root, and search down as in a plain BST.`,
+         two: "In the 2-3 tree, the same search visits one node per level." });
+  if (top.root === null) {
+    top.root = new Node(key);
+    snap({ line: L.attach, kind: "attach", cur: key, path: [key], key,
+           rb: `The tree was empty: <b>${key}</b> is the new node, red like every new node.`,
+           two: `The 2-3 tree is the single node <b>[${key}]</b>.` });
+  } else {
+    (function ins(p, store, path) {
+      path = path.concat([p.key]);
+      const here = words23(collapse(top.root), p.key);
+      if (key === p.key) {
+        snap({ line: L.dup, kind: "dup", cur: p.key, path, key,
+               rb: `<b>${key}</b> is already in the tree: no new node. The fixes below find nothing to do.`,
+               two: "Nothing changes in the 2-3 tree either." });
+      } else {
+        const goLeft = key < p.key;
+        snap({ line: goLeft ? L.left : L.right, kind: "down", cur: p.key, path, key,
+               rb: `p = <b>${p.key}</b>: ${key} ${goLeft ? "&lt;" : "&gt;"} ${p.key}, so go <b>${goLeft ? "left" : "right"}</b>.`,
+               two: `In the 2-3 tree we are in node <b>${fmt(here)}</b>.` });
+        const child = goLeft ? p.left : p.right;
+        const set = c => { if (goLeft) p.left = c; else p.right = c; };
+        if (child === null) {
+          const n = new Node(key);
+          set(n);
+          const leaf = words23(collapse(top.root), key);
+          const k = leaf.keys.length;
+          snap({ line: L.attach, kind: "attach", cur: key, path: path.concat([key]), key,
+                 rb: `Fell off the tree: <b>${key}</b> hangs here as a new <b>red</b> node, the ${goLeft ? "left" : "right"} child of ${p.key}.`,
+                 two: k === 2
+                   ? `${key} joins the leaf: it is now the 3-node <b>${fmt(leaf)}</b>. No new level.`
+                   : `${key} joins a full leaf: the temporary 4-node <b>${fmt(leaf)}</b>. It must split.` });
+        } else {
+          set(ins(child, set, path));
+        }
+      }
+      // back at p: the three fixes, in order
+      let fixed = false;
+      if (isRed(p.right) && !isRed(p.left)) {
+        const k = p.key;
+        p = rotateLeft(p);
+        store(p);
+        fixed = true;
+        const n23 = words23(collapse(top.root), p.key);
+        snap({ line: L.rotL, kind: "fix", name: `rotate_left(${k})`, cur: p.key, path, key, act: [k, p.key],
+               rb: `Back at p = <b>${k}</b>: its red link leans <b>right</b>. <code>rotate_left(${k})</code> brings ${p.key} up; the red link now leans left.`,
+               two: `The 2-3 tree does not change: <b>${fmt(n23)}</b> is still the same node, only drawn differently.` });
+      }
+      if (isRed(p.left) && isRed(p.left.left)) {
+        const k = p.key;
+        p = rotateRight(p);
+        store(p);
+        fixed = true;
+        const n23 = words23(collapse(top.root), p.key);
+        snap({ line: L.rotR, kind: "fix", name: `rotate_right(${k})`, cur: p.key, path, key, act: [k, p.key],
+               rb: `At p = <b>${k}</b>: <b>two red links in a row</b> on the left. <code>rotate_right(${k})</code> brings ${p.key} up, with a red child on each side.`,
+               two: `The 2-3 tree does not change: the 4-node <b>${fmt(n23)}</b> now has its middle key on top, ready to split.` });
+      }
+      if (isRed(p.left) && isRed(p.right)) {
+        flipColors(p);
+        fixed = true;
+        const isRoot = top.root === p;
+        const t = collapse(top.root);
+        const up = isRoot ? null : words23(t, p.key);
+        snap({ line: L.flip, kind: "flip", name: `flip_colors(${p.key})`, cur: p.key, path, key,
+               act: [p.left.key, p.key, p.right.key],
+               rb: `At p = <b>${p.key}</b>: <b>both children red</b>. <code>flip_colors(${p.key})</code>: ${p.left.key} and ${p.right.key} turn black, ${p.key} turns red.`,
+               two: isRoot
+                 ? `The 4-node <b>[${p.left.key} ${p.key} ${p.right.key}]</b> splits. ${p.key} moves up, but it is the root: it has no parent node yet.`
+                 : `The 4-node <b>[${p.left.key} ${p.key} ${p.right.key}]</b> splits: <b>${p.key}</b> moves up into its parent, now <b>${fmt(up)}</b>${up.keys.length === 3 ? ", a 4-node: it will split too" : ""}; ${p.left.key} and ${p.right.key} become two 2-nodes.` });
+      }
+      if (!fixed) {
+        snap({ line: L.ret, kind: "none", skippable: true, cur: p.key, path, key,
+               rb: `Back at p = <b>${p.key}</b>: no red link leans right, no two reds in a row, not two red children. Nothing to fix; return ${p.key}.`,
+               two: "The 2-3 tree does not change here." });
+      }
+      return p;
+    })(top.root, c => { top.root = c; }, []);
+  }
+  if (top.root.red) {
+    top.root.red = false;
+    const first = size(top.root) === 1;
+    snap({ line: L.black, kind: "root", name: "root -> black", cur: top.root.key, path: [], key,
+           rb: first ? `The root is always black: <b>${top.root.key}</b> turns black.`
+                     : `The root <b>${top.root.key}</b> is red after the split. <code>m_root->red = false</code> makes it black: every path gains one black node.`,
+           two: first ? "A 2-3 tree with one key." : `The split reached the root: <b>${top.root.key}</b> is a new root, and the 2-3 tree grew <b>one level, at the top</b>.` });
+  } else {
+    snap({ line: L.black, kind: "done", cur: null, path: [], key,
+           rb: `Done. The root is black already. Height ${height(top.root)}.`,
+           two: `The 2-3 tree has height ${height23(collapse(top.root))}; every leaf is at the same depth.` });
+  }
+  return { steps, root: top.root };
+}
+
+// ------------------------------------------------------------------ state
+let keysInserted = []; // insertion history (for undo and the plain BST height)
+let committed = null; // tree after the last finished insert
+let trace = null; // { steps, root }
+let idx = 0;
+let playing = null;
+let lastStep = null; // the step on screen, to keep the place when "skip" changes
+
+function plainBstHeight(keys) {
+  const lefts = new Map(), rights = new Map(); // key -> child key
+  let root = null, h = -1;
+  for (const k of keys) {
+    if (root === null) { root = k; h = Math.max(h, 0); continue; }
+    let p = root, d = 0;
+    for (;;) {
+      if (k === p) break;
+      const m = k < p ? lefts : rights;
+      d++;
+      if (!m.has(p)) { m.set(p, k); h = Math.max(h, d); break; }
+      p = m.get(p);
+    }
+  }
+  return h;
+}
+
+function visibleSteps() {
+  if (!trace) return [];
+  const skip = document.getElementById("skip").checked;
+  return trace.steps.filter(s => !(skip && s.skippable));
+}
+
+// ------------------------------------------------------------------ layout and drawing
+const DX = 46, DY = 66, RAD = 17;
+
+function layoutRB(root, flat) {
+  const pos = new Map();
+  let col = 0;
+  (function walk(p, d) {
+    if (p === null) return;
+    walk(p.left, d + (flat && isRed(p.left) ? 0 : 1));
+    pos.set(p.key, { x: col * DX, y: d * DY, red: p.red, node: p });
+    col++;
+    walk(p.right, d + (flat && isRed(p.right) ? 0 : 1));
+  })(root, 0);
+  return pos;
+}
+
+const SVGNS = "http://www.w3.org/2000/svg";
+function el(name, attrs, parent) {
+  const e = document.createElementNS(SVGNS, name);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+let shown = new Map(); // key -> {x, y} currently on screen
+let anim = null;
+let lastFlat = false;
+
+function drawRB(tree, step, posMap, flat) {
+  const svg = document.getElementById("rbsvg");
+  svg.innerHTML = "";
+  if (tree === null) {
+    svg.setAttribute("viewBox", "0 0 400 80");
+    const t = el("text", { x: 200, y: 45, "text-anchor": "middle", class: "lbl" }, svg);
+    t.textContent = "empty tree: insert a key";
+    return;
+  }
+  let minx = Infinity, maxx = -Infinity, maxy = 0;
+  for (const [, p] of posMap) { minx = Math.min(minx, p.x); maxx = Math.max(maxx, p.x); maxy = Math.max(maxy, p.y); }
+  const pad = 32;
+  const w = Math.max(maxx - minx + 2 * pad, 300);
+  const cx = (minx + maxx) / 2;
+  svg.setAttribute("viewBox", `${cx - w / 2} ${-pad} ${w} ${maxy + 2 * pad}`);
+  const g = el("g", {}, svg);
+  // 2-3 groups behind, when flat
+  if (flat) {
+    (function walk(p, isTop) {
+      if (p === null) return;
+      if (!p.red || isTop) {
+        const members = [];
+        (function mark(q) { members.push(q.key); if (isRed(q.left)) mark(q.left); if (isRed(q.right)) mark(q.right); })(p);
+        const xs = members.map(k => posMap.get(k).x), y = posMap.get(p.key).y;
+        const x0 = Math.min(...xs) - RAD - 6, x1 = Math.max(...xs) + RAD + 6;
+        el("rect", { x: x0, y: y - RAD - 6, width: x1 - x0, height: 2 * RAD + 12, rx: 11, class: "grp" }, g);
+      }
+      walk(p.left, false);
+      walk(p.right, false);
+    })(tree, true);
+  }
+  // edges
+  (function walk(p) {
+    if (p === null) return;
+    for (const c of [p.left, p.right]) {
+      if (c === null) continue;
+      const a = posMap.get(p.key), b = posMap.get(c.key);
+      el("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: c.red ? "e-red" : "e-black" }, g);
+      walk(c);
+    }
+  })(tree);
+  // nodes
+  const onPath = new Set(step ? step.path : []);
+  (function walk(p) {
+    if (p === null) return;
+    const q = posMap.get(p.key);
+    if (step && p.key === step.cur) el("circle", { cx: q.x, cy: q.y, r: RAD + 6, class: "ring-cur" }, g);
+    else if (onPath.has(p.key)) el("circle", { cx: q.x, cy: q.y, r: RAD + 5, class: "ring-path" }, g);
+    el("circle", { cx: q.x, cy: q.y, r: RAD, class: p.red ? "n-red" : "n-black" }, g);
+    const t = el("text", { x: q.x, y: q.y + 5, "text-anchor": "middle", class: "nk" }, g);
+    t.textContent = p.key;
+    walk(p.left);
+    walk(p.right);
+  })(tree);
+}
+
+function draw23(tree, step) {
+  const svg = document.getElementById("t23svg");
+  svg.innerHTML = "";
+  const t = collapse(tree);
+  if (t === null) {
+    svg.setAttribute("viewBox", "0 0 400 60");
+    return;
+  }
+  const maxLen = Math.max(...allKeys(t).map(k => String(k).length));
+  const CWD = maxLen >= 3 ? 42 : 34, NHT = 30, GAP = 14, LV = 62;
+  const pos = new Map();
+  let cur = 0;
+  (function lay(n, d) {
+    const w = n.keys.length * CWD;
+    if (n.kids.length === 0) { pos.set(n, { x: cur + w / 2, y: d * LV, w }); cur += w + GAP; return; }
+    n.kids.forEach(c => lay(c, d + 1));
+    const a = pos.get(n.kids[0]).x, b = pos.get(n.kids[n.kids.length - 1]).x;
+    pos.set(n, { x: (a + b) / 2, y: d * LV, w });
+  })(t, 0);
+  let minx = Infinity, maxx = -Infinity, maxy = 0;
+  for (const [, p] of pos) { minx = Math.min(minx, p.x - p.w / 2); maxx = Math.max(maxx, p.x + p.w / 2); maxy = Math.max(maxy, p.y); }
+  const pad = 22, w = Math.max(maxx - minx + 2 * pad, 300), cx = (minx + maxx) / 2;
+  svg.setAttribute("viewBox", `${cx - w / 2} ${-pad} ${w} ${maxy + NHT + 2 * pad - 12}`);
+  const g = el("g", {}, svg);
+  const act = new Set(step && step.act ? step.act : []);
+  const pathKeys = new Set(step ? step.path : []);
+  const newKey = step && (step.kind === "attach") ? step.key : null;
+  for (const [n, p] of pos) {
+    n.kids.forEach((c, i) => {
+      const q = pos.get(c);
+      const sx = p.x - p.w / 2 + i * (p.w / n.keys.length);
+      const cl = Math.min(Math.max(sx, p.x - p.w / 2 + 5), p.x + p.w / 2 - 5);
+      const onP = n.keys.some(k => pathKeys.has(k)) && c.keys.some(k => pathKeys.has(k));
+      el("line", { x1: cl, y1: p.y + NHT / 2, x2: q.x, y2: q.y - NHT / 2, class: "e23" + (onP ? " path" : "") }, g);
+    });
+  }
+  for (const [n, p] of pos) {
+    let cls = "n23";
+    if (n.keys.length >= 3) cls += " temp";
+    else if (n.keys.some(k => act.has(k)) || (newKey !== null && n.keys.includes(newKey))) cls += " act";
+    else if (step && step.cur !== null && n.keys.includes(step.cur)) cls += " cur";
+    el("rect", { x: p.x - p.w / 2, y: p.y - NHT / 2, width: p.w, height: NHT, rx: 8, class: cls }, g);
+    n.keys.forEach((k, i) => {
+      if (i > 0) {
+        const dx = p.x - p.w / 2 + i * CWD;
+        el("line", { x1: dx, y1: p.y - NHT / 2 + 3, x2: dx, y2: p.y + NHT / 2 - 3, class: "div23" }, g);
+      }
+      const tx = el("text", { x: p.x - p.w / 2 + (i + 0.5) * CWD, y: p.y + 5, "text-anchor": "middle",
+                              class: "k23" + (k === newKey ? " new" : "") }, g);
+      tx.textContent = k;
+    });
+  }
+}
+function allKeys(t) { return t ? t.keys.concat(...t.kids.map(allKeys)) : []; }
+
+// animate the red-black tree from what is on screen to the target layout
+function showRB(tree, step) {
+  const flat = document.getElementById("flat").checked;
+  const target = layoutRB(tree, flat);
+  const start = new Map();
+  for (const [k, p] of target) {
+    if (shown.has(k)) start.set(k, shown.get(k));
+    else {
+      // a new node grows out of its parent
+      let par = null;
+      (function walk(q) {
+        if (!q || par) return;
+        if ((q.left && q.left.key === k) || (q.right && q.right.key === k)) par = q.key;
+        walk(q.left); walk(q.right);
+      })(tree);
+      start.set(k, par !== null && shown.has(par) ? shown.get(par) : { x: p.x, y: p.y });
+    }
+  }
+  if (anim) cancelAnimationFrame(anim);
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const dur = reduce ? 0 : 420;
+  const t0 = performance.now();
+  const frame = now => {
+    const u = dur === 0 ? 1 : Math.min(1, (now - t0) / dur);
+    const e = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+    const cur = new Map();
+    for (const [k, p] of target) {
+      const s = start.get(k);
+      cur.set(k, { x: s.x + (p.x - s.x) * e, y: s.y + (p.y - s.y) * e });
+    }
+    drawRB(tree, step, cur, flat);
+    if (u < 1) anim = requestAnimationFrame(frame);
+    else { anim = null; shown = cur; }
+  };
+  shown = new Map([...target].map(([k, p]) => [k, { x: p.x, y: p.y }]));
+  // shown is set to the target now, so a new animation starts from the right place
+  // even if this one is interrupted; the first frame still uses `start`
+  anim = requestAnimationFrame(frame);
+}
+
+// ------------------------------------------------------------------ UI
+function render() {
+  const steps = visibleSteps();
+  const step = steps.length ? steps[idx] : null;
+  lastStep = step;
+  const tree = step ? step.tree : committed;
+  renderCode(step ? step.line : -1);
+  showRB(tree, step);
+  draw23(tree, step);
+  const msg = document.getElementById("msg");
+  const chip = document.getElementById("chip");
+  const no = document.getElementById("stepno");
+  if (step) {
+    msg.innerHTML = `<p>${step.rb}</p><p class="two">2-3 view: ${step.two}</p>`;
+    no.textContent = `insert ${step.key}: step ${idx + 1} of ${steps.length}`;
+    const kind = { fix: ["fix", step.name], flip: ["flip", step.name], root: ["done", "root -> black"],
+                   done: ["done", "done"], attach: ["", "new red node"], down: ["", "search"],
+                   start: ["", "start"], none: ["", "nothing to fix"], dup: ["", "already there"] }[step.kind];
+    chip.className = "chip " + kind[0];
+    chip.textContent = kind[1];
+  } else {
+    msg.innerHTML = committed ? "<p>Insert another key, or try a preset.</p>" : "<p>The tree is empty. Type a key and click <b>Insert</b>, or pick a preset under <b>Try</b>.</p>";
+    no.textContent = "";
+    chip.className = "chip";
+    chip.textContent = "";
+  }
+  const atEnd = !trace || idx >= steps.length - 1;
+  document.getElementById("next").disabled = atEnd;
+  document.getElementById("last").disabled = atEnd;
+  document.getElementById("prev").disabled = !trace || idx === 0;
+  document.getElementById("first").disabled = !trace || idx === 0;
+  document.getElementById("play").disabled = atEnd;
+  document.getElementById("undo").disabled = keysInserted.length === 0;
+  renderStats(tree);
+}
+
+function renderStats(tree) {
+  const n = size(tree);
+  const h = tree ? height(tree) : "-";
+  const b = tree ? blackCount(tree) : "-";
+  const t = collapse(tree);
+  const h23 = t ? height23(t) : "-";
+  const keysSoFar = trace && idx < visibleSteps().length - 1 ? keysInserted.slice(0, -1) : keysInserted;
+  const hb = keysSoFar.length ? plainBstHeight(keysSoFar) : "-";
+  const bound = n ? (2 * Math.log2(n + 1)).toFixed(1) : "-";
+  const items = [
+    ["keys", n],
+    ["LLRB height", h],
+    ["black nodes per path", b],
+    ["2-3 tree height", h23],
+    ["bound 2 log2(n+1)", bound],
+    ["plain BST height, same order", hb],
+  ];
+  document.getElementById("stats").innerHTML = items.map(([k, v], i) =>
+    `<div class="${i === 5 && typeof hb === "number" && typeof h === "number" && hb > h ? "bad" : ""}"><span class="v">${v}</span><span class="k">${k}</span></div>`).join("");
+}
+
+function finishTrace() {
+  if (!trace) return;
+  committed = trace.root;
+  trace = null;
+  idx = 0;
+}
+
+function stopPlay() {
+  if (playing) { clearInterval(playing); playing = null; }
+  document.getElementById("play").textContent = "Play";
+}
+
+function err(s) { document.getElementById("err").textContent = s || ""; }
+
+function parseKeys(s) {
+  const parts = s.split(/[\s,;]+/).filter(x => x.length);
+  const out = [];
+  for (const p of parts) {
+    if (!/^-?\d+$/.test(p)) return { error: `"${p}" is not a whole number` };
+    const k = parseInt(p, 10);
+    if (k < -999 || k > 9999) return { error: "keys must be between -999 and 9999" };
+    out.push(k);
+  }
+  return { keys: out };
+}
+
+const MAXN = 48;
+
+function startInsert(key) {
+  stopPlay();
+  finishTrace();
+  if (size(committed) >= MAXN && !find(committed, key)) { err(`This demo holds at most ${MAXN} keys. Click Clear.`); return; }
+  err("");
+  trace = traceInsert(committed, key);
+  keysInserted.push(key);
+  idx = 0;
+  render();
+}
+
+function insertAll(keys) {
+  stopPlay();
+  finishTrace();
+  let t = committed;
+  for (const k of keys) {
+    if (size(t) >= MAXN && !find(t, k)) { err(`Stopped at ${MAXN} keys.`); break; }
+    t = insertPlain(t, k);
+    keysInserted.push(k);
+  }
+  committed = t;
+  render();
+}
+
+function rebuild(keys) {
+  stopPlay();
+  trace = null;
+  committed = null;
+  keysInserted = [];
+  shown = new Map();
+  insertAll(keys);
+}
+
+document.getElementById("insert").onclick = () => {
+  const r = parseKeys(document.getElementById("key").value);
+  if (r.error) { err(r.error); return; }
+  if (r.keys.length !== 1) { err("Type one key here; use Sequence for several."); return; }
+  startInsert(r.keys[0]);
+  document.getElementById("key").select();
+};
+document.getElementById("key").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("insert").click(); });
+document.getElementById("insertAll").onclick = () => {
+  const r = parseKeys(document.getElementById("seq").value);
+  if (r.error) { err(r.error); return; }
+  err("");
+  insertAll(r.keys);
+};
+document.getElementById("seq").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("insertAll").click(); });
+document.getElementById("undo").onclick = () => {
+  finishTrace();
+  const ks = keysInserted.slice(0, -1);
+  rebuild(ks);
+};
+document.getElementById("clear").onclick = () => { rebuild([]); err(""); };
+
+function go(i) {
+  const n = visibleSteps().length;
+  if (!n) return;
+  idx = Math.max(0, Math.min(n - 1, i));
+  render();
+}
+document.getElementById("next").onclick = () => { stopPlay(); go(idx + 1); };
+document.getElementById("prev").onclick = () => { stopPlay(); go(idx - 1); };
+document.getElementById("first").onclick = () => { stopPlay(); go(0); };
+document.getElementById("last").onclick = () => { stopPlay(); go(visibleSteps().length - 1); };
+document.getElementById("play").onclick = () => {
+  if (playing) { stopPlay(); return; }
+  document.getElementById("play").textContent = "Pause";
+  const tick = () => {
+    if (idx >= visibleSteps().length - 1) { stopPlay(); render(); return; }
+    go(idx + 1);
+  };
+  playing = setInterval(tick, +document.getElementById("speed").value);
+};
+document.getElementById("speed").oninput = () => {
+  if (playing) { stopPlay(); document.getElementById("play").click(); }
+};
+document.getElementById("skip").onchange = () => {
+  const steps = trace ? trace.steps : [];
+  const curStep = lastStep;
+  if (!trace) { render(); return; }
+  {
+    const vs = visibleSteps();
+    let j = vs.indexOf(curStep);
+    if (j < 0) { // the step we were on is now hidden: go to the next visible one
+      const all = steps.indexOf(curStep);
+      j = vs.findIndex(s => steps.indexOf(s) > all);
+      if (j < 0) j = vs.length - 1;
+    }
+    go(j);
+  }
+};
+document.getElementById("flat").onchange = () => render();
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT" && e.target.type === "text") return;
+  if (e.key === " " && e.target.tagName === "BUTTON") return; // the browser clicks it already
+  if (e.key === "ArrowRight") { e.preventDefault(); document.getElementById("next").click(); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); document.getElementById("prev").click(); }
+  else if (e.key === " ") { e.preventDefault(); document.getElementById("play").click(); }
+  else if (e.key === "Home") { e.preventDefault(); document.getElementById("first").click(); }
+  else if (e.key === "End") { e.preventDefault(); document.getElementById("last").click(); }
+});
+
+// ------------------------------------------------------------------ presets
+// "steps" presets insert all but the last key at once, then trace the last one
+const PRESETS = [
+  { label: "10 ... 70 in order (lectures 15, 16)", keys: [10, 20, 30, 40, 50, 60], last: 70 },
+  { label: "insert 42 (lecture 15)", keys: [30, 20, 50, 15, 45, 70, 75, 65, 40, 25, 80], last: 42 },
+  { label: "into a 3-node: between", keys: [50, 30, 60, 20], last: 25 },
+  { label: "Exercise 16-2", keys: [10, 20, 30, 40, 50, 15, 25], last: 35 },
+  { label: "1 ... 31 in order", keys: Array.from({ length: 30 }, (_, i) => i + 1), last: 31 },
+  { label: "15 random keys", random: true },
+];
+const pre = document.getElementById("presets");
+PRESETS.forEach(p => {
+  const b = document.createElement("button");
+  b.textContent = p.label;
+  b.onclick = () => {
+    err("");
+    if (p.random) {
+      const s = new Set();
+      while (s.size < 15) s.add(1 + Math.floor(Math.random() * 99));
+      const ks = [...s];
+      document.getElementById("seq").value = ks.join(" ");
+      rebuild(ks.slice(0, -1));
+      startInsert(ks[ks.length - 1]);
+      return;
+    }
+    document.getElementById("seq").value = p.keys.concat([p.last]).join(" ");
+    rebuild(p.keys);
+    startInsert(p.last);
+  };
+  pre.appendChild(b);
+});
+
+render();
+</script>
+</body>
+</html>
